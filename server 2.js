@@ -7,7 +7,7 @@ const fs = require('fs');
 const app = express();
 const PORT = 3000;
 
-const PASSWORD = 'limon2025';
+const PASSWORD = 'limonwithyang444';
 const MAX_LOGIN_ATTEMPTS = 5;
 const LOCKOUT_TIME = 60 * 1000;
 const loginAttempts = {};
