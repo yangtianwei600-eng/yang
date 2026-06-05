@@ -80,9 +80,13 @@ app.post('/logout', (req, res) => {
 });
 
 app.get('/home', requireLogin, (req, res) => {
+  res.sendFile(path.join(__dirname, 'views/home.html'));
+});
+
+app.get('/api/photos', requireLogin, (req, res) => {
   const files = fs.readdirSync(path.join(__dirname, 'uploads'))
     .filter(f => /\.(jpg|jpeg|png|gif|webp)$/i.test(f));
-  res.send(getHomePage(files));
+  res.json(files);
 });
 
 app.post('/upload', requireLogin, upload.single('photo'), (req, res) => {
@@ -111,18 +115,15 @@ body{
   min-height:100vh;
   display:flex;align-items:center;justify-content:center;
   font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display',sans-serif;
-  background:#060610;
-  overflow:hidden;
+  background:#060610;overflow:hidden;
 }
 canvas#bg{position:fixed;inset:0;z-index:0;}
 .card{
   position:relative;z-index:10;
   background:rgba(255,255,255,0.05);
-  backdrop-filter:blur(24px);
-  -webkit-backdrop-filter:blur(24px);
+  backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);
   border:1px solid rgba(255,255,255,0.1);
-  border-radius:28px;
-  padding:52px 44px;width:360px;
+  border-radius:28px;padding:52px 44px;width:360px;
   box-shadow:0 8px 48px rgba(0,0,0,0.5);
   text-align:center;
   animation:cardIn 0.8s cubic-bezier(0.34,1.56,0.64,1);
@@ -175,7 +176,7 @@ const ctx=canvas.getContext('2d');
 let W,H,pts=[];
 function resize(){W=canvas.width=window.innerWidth;H=canvas.height=window.innerHeight;}
 resize();window.addEventListener('resize',resize);
-for(let i=0;i<100;i++) pts.push({x:Math.random()*W,y:Math.random()*H,r:Math.random()*1.2+0.2,a:Math.random(),da:(Math.random()-0.5)*0.01,dx:(Math.random()-0.5)*0.25,dy:(Math.random()-0.5)*0.25,c:Math.random()>0.5?'125,211,255':'244,114,182'});
+for(let i=0;i<100;i++) pts.push({x:Math.random()*window.innerWidth,y:Math.random()*window.innerHeight,r:Math.random()*1.2+0.2,a:Math.random(),da:(Math.random()-0.5)*0.01,dx:(Math.random()-0.5)*0.25,dy:(Math.random()-0.5)*0.25,c:Math.random()>0.5?'125,211,255':'244,114,182'});
 (function loop(){
   ctx.fillStyle='rgba(6,6,16,0.15)';ctx.fillRect(0,0,W,H);
   pts.forEach(p=>{
@@ -203,376 +204,5 @@ async function doLogin(){
   else{msg.textContent=data.message||'Wrong password.';document.getElementById('pw').value='';}
 }
 </script>
-</body></html>`;
-}
-
-function getHomePage(files) {
-  const imgs = files.map(f => `
-    <div class="img-wrap" onclick="handleClick(this,event)">
-      <img src="/uploads/${f}" alt="photo" loading="lazy"/>
-      <div class="overlay-text"></div>
-    </div>`).join('');
-
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>with you ❤️</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"><\/script>
-<style>
-*{margin:0;padding:0;box-sizing:border-box;}
-body{
-  min-height:100vh;
-  font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display',sans-serif;
-  background:#060610;
-  color:rgba(255,255,255,0.85);
-  overflow-x:hidden;
-}
-#threeCanvas{position:fixed;inset:0;z-index:0;pointer-events:none;}
-header{
-  position:sticky;top:0;z-index:100;
-  padding:16px 32px;
-  display:flex;align-items:center;justify-content:space-between;
-  background:rgba(6,6,16,0.5);
-  backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
-  border-bottom:1px solid rgba(255,255,255,0.06);
-}
-.logo{font-size:17px;font-weight:600;color:rgba(255,255,255,0.85);}
-.logo span{background:linear-gradient(90deg,#7dd3ff,#f472b6);-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
-.header-btns{display:flex;gap:10px;align-items:center;}
-.upload-btn{
-  padding:8px 18px;
-  background:linear-gradient(135deg,#7dd3ff,#a78bfa);
-  border:none;border-radius:20px;color:white;
-  font-size:13px;font-weight:600;cursor:pointer;transition:all 0.2s;
-}
-.upload-btn:hover{transform:translateY(-1px);box-shadow:0 4px 18px rgba(125,211,255,0.35);}
-.logout-btn{
-  padding:8px 16px;
-  background:rgba(255,255,255,0.06);
-  border:1px solid rgba(255,255,255,0.1);
-  border-radius:20px;color:rgba(255,255,255,0.4);
-  font-size:13px;cursor:pointer;transition:all 0.2s;
-}
-.logout-btn:hover{background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.7);}
-.hero{
-  position:relative;z-index:1;
-  text-align:center;padding:380px 20px 40px;
-}
-.hero h1{
-  font-size:clamp(28px,5vw,48px);font-weight:700;
-  background:linear-gradient(135deg,#7dd3ff,#c4b5fd,#f472b6);
-  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
-  letter-spacing:-1px;
-  animation:fadeUp 0.9s cubic-bezier(0.34,1.56,0.64,1) both;
-}
-.hero p{margin-top:10px;font-size:15px;color:rgba(255,255,255,0.25);animation:fadeUp 1s ease both;}
-@keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
-.gallery-wrap{position:relative;z-index:1;max-width:1100px;margin:0 auto;padding:20px 24px 100px;}
-.gallery{columns:3 260px;column-gap:16px;}
-.img-wrap{
-  break-inside:avoid;margin-bottom:16px;
-  border-radius:18px;overflow:hidden;position:relative;
-  cursor:pointer;
-  background:rgba(255,255,255,0.03);
-  border:1px solid rgba(255,255,255,0.07);
-  box-shadow:0 4px 24px rgba(0,0,0,0.4);
-  transition:transform 0.35s cubic-bezier(0.34,1.56,0.64,1),box-shadow 0.3s,border-color 0.3s;
-}
-.img-wrap:hover{transform:scale(1.02) translateY(-2px);box-shadow:0 12px 40px rgba(0,0,0,0.5);border-color:rgba(125,211,255,0.2);}
-.img-wrap.clicked{transform:scale(1.05);}
-.img-wrap img{width:100%;display:block;border-radius:18px;}
-.overlay-text{
-  position:absolute;bottom:0;left:0;right:0;
-  padding:24px 16px 16px;
-  background:linear-gradient(transparent,rgba(0,0,0,0.65));
-  color:white;font-size:13px;font-weight:500;
-  opacity:0;transition:opacity 0.35s;
-  border-radius:0 0 18px 18px;text-align:center;
-}
-.img-wrap.show-text .overlay-text{opacity:1;}
-.empty{
-  text-align:center;padding:80px 20px;
-  background:rgba(255,255,255,0.02);
-  backdrop-filter:blur(15px);
-  border:1px solid rgba(255,255,255,0.06);
-  border-radius:24px;color:rgba(255,255,255,0.2);font-size:15px;
-}
-.modal{
-  display:none;position:fixed;inset:0;z-index:200;
-  align-items:center;justify-content:center;
-  background:rgba(0,0,0,0.7);
-  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
-}
-.modal.open{display:flex;}
-.modal-card{
-  background:rgba(12,12,24,0.9);
-  backdrop-filter:blur(30px);-webkit-backdrop-filter:blur(30px);
-  border:1px solid rgba(255,255,255,0.1);
-  border-radius:24px;padding:40px;width:340px;
-  box-shadow:0 20px 60px rgba(0,0,0,0.6);
-  animation:cardIn 0.4s cubic-bezier(0.34,1.56,0.64,1);
-  text-align:center;
-}
-@keyframes cardIn{from{opacity:0;transform:scale(0.85)}to{opacity:1;transform:scale(1)}}
-.modal-card h2{font-size:18px;font-weight:600;color:rgba(255,255,255,0.85);margin-bottom:20px;}
-.drop-zone{
-  border:1.5px dashed rgba(125,211,255,0.2);
-  border-radius:16px;padding:32px 16px;margin-bottom:18px;
-  cursor:pointer;transition:all 0.2s;color:rgba(255,255,255,0.25);font-size:14px;
-}
-.drop-zone:hover{background:rgba(125,211,255,0.04);border-color:rgba(125,211,255,0.45);}
-.drop-zone input{display:none;}
-.modal-btns{display:flex;gap:10px;}
-.modal-btns button{flex:1;padding:12px;border-radius:14px;font-size:14px;font-weight:600;cursor:pointer;border:none;transition:all 0.2s;}
-.btn-upload{background:linear-gradient(135deg,#7dd3ff,#a78bfa);color:white;}
-.btn-cancel{background:rgba(255,255,255,0.05);color:rgba(255,255,255,0.35);}
-.upload-msg{font-size:12px;color:#f472b6;margin-top:10px;min-height:16px;}
-</style>
-</head>
-<body>
-<canvas id="threeCanvas"></canvas>
-<header>
-  <div class="logo">with<span>.you</span></div>
-  <div class="header-btns">
-    <button class="upload-btn" onclick="openModal()">+ Memory</button>
-    <form method="POST" action="/logout" style="margin:0">
-      <button type="submit" class="logout-btn">Leave</button>
-    </form>
-  </div>
-</header>
-<div class="hero">
-  <h1>For Limon ❤️</h1>
-  <p>Every moment with you is worth keeping</p>
-</div>
-<div class="gallery-wrap">
-  ${files.length === 0
-    ? '<div class="empty">✦ No memories yet — upload the first one</div>'
-    : `<div class="gallery">${imgs}</div>`}
-</div>
-<div class="modal" id="modal">
-  <div class="modal-card">
-    <h2>Add a memory ✦</h2>
-    <div class="drop-zone" onclick="document.getElementById('fileInput').click()">
-      <input type="file" id="fileInput" accept="image/*" onchange="previewFile(this)"/>
-      <div id="dropLabel">Click to choose a photo</div>
-    </div>
-    <div class="modal-btns">
-      <button class="btn-upload" onclick="doUpload()">Upload</button>
-      <button class="btn-cancel" onclick="closeModal()">Cancel</button>
-    </div>
-    <p class="upload-msg" id="uploadMsg"></p>
-  </div>
-</div>
-
-<script>
-// ═══════════════════════════════════════════
-// THREE.JS WebGL 粒子爱心系统
-// ═══════════════════════════════════════════
-(function(){
-  const canvas = document.getElementById('threeCanvas');
-  const W = window.innerWidth, H = window.innerHeight;
-  const DPR = Math.min(window.devicePixelRatio || 1, 2);
-
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, alpha: true });
-  renderer.setPixelRatio(DPR);
-  renderer.setSize(W, H);
-  renderer.setClearColor(0x060610, 1);
-
-  const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(60, W / H, 0.1, 1000);
-  camera.position.z = 5;
-
-  // ── 爱心坐标（初始化一次）──
-  const COUNT = 1200;
-  const positions = new Float32Array(COUNT * 3);
-  const origins   = new Float32Array(COUNT * 3);
-  const randoms   = new Float32Array(COUNT * 3);
-
-  const scale = 1.4;
-  for(let i = 0; i < COUNT; i++){
-    const t = (i / COUNT) * Math.PI * 2;
-    const x = 16 * Math.pow(Math.sin(t), 3);
-    const y = 13 * Math.cos(t) - 5 * Math.cos(2*t) - 2 * Math.cos(3*t) - Math.cos(4*t);
-    const hx = (x / 16) * scale;
-    const hy = (y / 16) * scale;
-    origins[i*3]   = hx;
-    origins[i*3+1] = hy;
-    origins[i*3+2] = 0;
-    // 初始位置随机散开
-    positions[i*3]   = (Math.random() - 0.5) * 10;
-    positions[i*3+1] = (Math.random() - 0.5) * 10;
-    positions[i*3+2] = (Math.random() - 0.5) * 2;
-    randoms[i*3]   = Math.random();
-    randoms[i*3+1] = Math.random() * Math.PI * 2;
-    randoms[i*3+2] = Math.random() * 0.5 + 0.5;
-  }
-
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-  geo.setAttribute('aOrigin',  new THREE.BufferAttribute(origins, 3));
-  geo.setAttribute('aRandom',  new THREE.BufferAttribute(randoms, 3));
-
-  // ── ShaderMaterial ──
-  const mat = new THREE.ShaderMaterial({
-    uniforms: {
-      uTime:    { value: 0 },
-      uPointer: { value: new THREE.Vector2(9999, 9999) },
-      uProgress:{ value: 0 }
-    },
-    vertexShader: \`
-      uniform float uTime;
-      uniform vec2  uPointer;
-      uniform float uProgress;
-      attribute vec3 aOrigin;
-      attribute vec3 aRandom;
-      varying float vAlpha;
-      varying vec3  vColor;
-
-      void main(){
-        // 吸附到爱心
-        float prog = clamp(uProgress, 0.0, 1.0);
-        float ease = 1.0 - pow(1.0 - prog, 3.0);
-
-        vec3 pos = mix(position, aOrigin, ease);
-
-        // 持续流动：sin/cos 波动
-        float flow = aRandom.y + uTime * (0.4 + aRandom.z * 0.4);
-        pos.x += sin(flow) * 0.045 * (1.0 - ease * 0.3);
-        pos.y += cos(flow * 1.3) * 0.035 * (1.0 - ease * 0.3);
-
-        // 呼吸
-        float breath = 1.0 + sin(uTime * 0.9 + aRandom.y * 6.28) * 0.025;
-        pos.xy *= breath;
-
-        // 手指力场
-        vec4 worldPos = modelMatrix * vec4(pos, 1.0);
-        vec2 diff = worldPos.xy - uPointer;
-        float dist = length(diff);
-        float force = 0.35 / (dist * dist + 0.3);
-        pos.xy += normalize(diff) * force * 0.18;
-
-        vAlpha = 0.5 + 0.5 * sin(uTime * 1.5 + aRandom.y * 6.28);
-        vAlpha *= (0.7 + aRandom.z * 0.3);
-
-        // 颜色：蓝→紫→粉
-        float hue = fract(aRandom.x + uTime * 0.04);
-        if(hue < 0.33){
-          vColor = mix(vec3(0.49,0.83,1.0), vec3(0.655,0.545,0.98), hue * 3.0);
-        } else if(hue < 0.66){
-          vColor = mix(vec3(0.655,0.545,0.98), vec3(0.957,0.447,0.714), (hue-0.33)*3.0);
-        } else {
-          vColor = mix(vec3(0.957,0.447,0.714), vec3(0.49,0.83,1.0), (hue-0.66)*3.0);
-        }
-
-        gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
-        gl_PointSize = (2.5 + aRandom.z * 2.0) * (1.0 / -gl_Position.z + 1.5);
-      }
-    \`,
-    fragmentShader: \`
-      varying float vAlpha;
-      varying vec3  vColor;
-      void main(){
-        vec2 uv = gl_PointCoord - 0.5;
-        float d = length(uv);
-        if(d > 0.5) discard;
-        float glow = 1.0 - smoothstep(0.0, 0.5, d);
-        glow = pow(glow, 1.4);
-        gl_FragColor = vec4(vColor, glow * vAlpha);
-      }
-    \`,
-    transparent: true,
-    blending: THREE.AdditiveBlending,
-    depthWrite: false
-  });
-
-  const points = new THREE.Points(geo, mat);
-  scene.add(points);
-
-  // ── 吸附进度动画 ──
-  let progress = 0;
-  const pointer = new THREE.Vector2(9999, 9999);
-
-  // ── 手指/鼠标 ──
-  function updatePointer(clientX, clientY){
-    const x = (clientX / window.innerWidth)  * 2 - 1;
-    const y = -(clientY / window.innerHeight) * 2 + 1;
-    // 转换到世界坐标（z=0平面）
-    pointer.set(x * camera.aspect * Math.tan(THREE.MathUtils.degToRad(30)) * camera.position.z,
-                y * Math.tan(THREE.MathUtils.degToRad(30)) * camera.position.z);
-  }
-  window.addEventListener('mousemove', e => updatePointer(e.clientX, e.clientY));
-  window.addEventListener('touchmove', e => {
-    e.preventDefault();
-    updatePointer(e.touches[0].clientX, e.touches[0].clientY);
-  }, { passive: false });
-  window.addEventListener('mouseleave', () => pointer.set(9999, 9999));
-  window.addEventListener('touchend',   () => pointer.set(9999, 9999));
-
-  // ── resize ──
-  window.addEventListener('resize', () => {
-    const w = window.innerWidth, h = window.innerHeight;
-    renderer.setSize(w, h);
-    camera.aspect = w / h;
-    camera.updateProjectionMatrix();
-  });
-
-  // ── 动画循环 ──
-  let t = 0;
-  function animate(){
-    requestAnimationFrame(animate);
-    t += 0.016;
-    progress = Math.min(1, progress + 0.006);
-    mat.uniforms.uTime.value    = t;
-    mat.uniforms.uProgress.value = progress;
-    mat.uniforms.uPointer.value.set(pointer.x, pointer.y);
-    renderer.render(scene, camera);
-  }
-  animate();
-})();
-
-// ═══════════════════════════════════════════
-// 图片互动
-// ═══════════════════════════════════════════
-const messages = ['I like being with you ❤️','Stay a bit longer','You make everything better','I miss you already ✨','Always you ❤️'];
-const msgIndex = new WeakMap();
-function handleClick(el, e){
-  const i = msgIndex.get(el) || 0;
-  el.querySelector('.overlay-text').textContent = messages[i % messages.length];
-  el.classList.add('show-text','clicked');
-  msgIndex.set(el, i + 1);
-  setTimeout(()=>el.classList.remove('clicked'), 400);
-  setTimeout(()=>el.classList.remove('show-text'), 3000);
-}
-
-// ═══════════════════════════════════════════
-// 上传弹窗
-// ═══════════════════════════════════════════
-function openModal(){ document.getElementById('modal').classList.add('open'); }
-function closeModal(){
-  document.getElementById('modal').classList.remove('open');
-  document.getElementById('fileInput').value='';
-  document.getElementById('dropLabel').textContent='Click to choose a photo';
-  document.getElementById('uploadMsg').textContent='';
-}
-function previewFile(input){
-  if(input.files[0]) document.getElementById('dropLabel').textContent='📷 '+input.files[0].name;
-}
-async function doUpload(){
-  const f=document.getElementById('fileInput').files[0];
-  const msg=document.getElementById('uploadMsg');
-  if(!f){msg.textContent='Please choose a photo first.';return;}
-  msg.textContent='Uploading...';
-  const fd=new FormData();fd.append('photo',f);
-  const r=await fetch('/upload',{method:'POST',body:fd});
-  const data=await r.json();
-  if(data.success){closeModal();location.reload();}
-  else{msg.textContent=data.message||'Upload failed.';}
-}
-document.getElementById('modal').addEventListener('click',function(e){
-  if(e.target===this)closeModal();
-});
-<\/script>
 </body></html>`;
 }
