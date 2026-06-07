@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Custom Engine — Minimal Rendering Kernel (Step 1)
 
 A from-scratch WebGL2 + TypeScript rendering kernel. This step renders a single
@@ -32,3 +33,6 @@ axis; a soft specular highlight sweeps across it as it turns. Edges are anti-ali
 - `npm run dev` — dev server with HMR, bound to the LAN
 - `npm run build` — type-check (tsc) + production bundle
 - `npm run preview` — serve the production build over the LAN
+=======
+# yang
+>>>>>>> 2a6bda0fde7cee74375801fe05f5b8d6b2b90731

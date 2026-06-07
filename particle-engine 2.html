@@ -1,0 +1,784 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Particle Engine · with.you</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;}
+  html,body{width:100%;height:100%;overflow:hidden;background:#04060f;font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;}
+  #gpu-canvas{position:fixed;inset:0;width:100%;height:100%;display:block;}
+
+  /* ---- HUD ---- */
+  .hud{position:fixed;z-index:10;color:#9fc7ff;-webkit-user-select:none;user-select:none;}
+  .top-left{top:18px;left:20px;}
+  .title{font-size:13px;font-weight:700;letter-spacing:2px;color:#cfe5ff;text-transform:uppercase;}
+  .title b{background:linear-gradient(90deg,#7fd2ff,#b69cff,#ff9ed6);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;}
+  .sub{margin-top:4px;font-size:10px;letter-spacing:1px;color:#5f7aa8;}
+  .stats{margin-top:10px;font-size:10px;line-height:1.7;color:#6f8cba;}
+  .stats span{color:#9fe0ff;}
+
+  .top-right{top:16px;right:18px;text-align:right;}
+  .badge{display:inline-block;padding:5px 11px;border-radius:20px;font-size:10px;letter-spacing:1px;border:1px solid rgba(120,180,255,.25);background:rgba(20,40,80,.35);backdrop-filter:blur(10px);}
+  .badge.webgpu{color:#7dffb0;border-color:rgba(125,255,176,.4);}
+  .badge.webgl{color:#ffd27d;border-color:rgba(255,210,125,.4);}
+
+  /* ---- bottom control dock ---- */
+  .dock{position:fixed;z-index:10;bottom:20px;left:50%;transform:translateX(-50%);
+    display:flex;gap:8px;align-items:center;padding:8px 10px;border-radius:18px;
+    background:rgba(12,22,44,.55);backdrop-filter:blur(16px);border:1px solid rgba(120,180,255,.15);
+    max-width:94vw;flex-wrap:wrap;justify-content:center;}
+  .chip{padding:7px 13px;border-radius:13px;font-size:11px;letter-spacing:.5px;cursor:pointer;
+    color:#8fb4e6;border:1px solid rgba(120,180,255,.18);background:rgba(30,52,96,.3);transition:all .2s;white-space:nowrap;}
+  .chip:hover{color:#cfe6ff;border-color:rgba(120,180,255,.5);}
+  .chip.on{color:#fff;background:linear-gradient(135deg,#3a78d8,#7a5cf0);border-color:transparent;box-shadow:0 0 14px rgba(120,140,255,.35);}
+  .dock .sep{width:1px;height:20px;background:rgba(120,180,255,.18);margin:0 2px;}
+  .dock .lbl{font-size:9px;color:#5f7aa8;letter-spacing:1px;margin-right:2px;}
+
+  /* center poem */
+  .poem{position:fixed;z-index:9;left:50%;top:50%;transform:translate(-50%,-50%);
+    text-align:center;color:#dceaff;font-size:clamp(15px,4.4vw,30px);font-weight:300;letter-spacing:3px;
+    line-height:1.8;pointer-events:none;text-shadow:0 0 24px rgba(120,170,255,.6);opacity:0;
+    transition:opacity 1.6s ease;max-width:84vw;font-family:"PingFang SC","Hiragino Sans GB",system-ui,sans-serif;}
+  .poem.show{opacity:.92;}
+
+  /* fallback / loading */
+  .overlay{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;
+    background:#04060f;color:#9fc7ff;text-align:center;padding:30px;flex-direction:column;gap:14px;}
+  .overlay h2{font-size:16px;letter-spacing:1px;color:#cfe5ff;}
+  .overlay p{font-size:12px;line-height:1.8;color:#6f8cba;max-width:440px;}
+  .overlay .spin{width:34px;height:34px;border:2px solid rgba(120,180,255,.2);border-top-color:#7fd2ff;border-radius:50%;animation:sp 1s linear infinite;}
+  @keyframes sp{to{transform:rotate(360deg);}}
+  .hidden{display:none!important;}
+  a{color:#7fd2ff;}
+</style>
+</head>
+<body>
+<canvas id="gpu-canvas"></canvas>
+
+<div class="overlay" id="loading">
+  <div class="spin"></div>
+  <p>Initializing GPU particle engine…</p>
+</div>
+
+<div class="hud top-left hidden" id="hud-left">
+  <div class="title"><b>PARTICLE ENGINE</b></div>
+  <div class="sub">with.you · GPGPU compute</div>
+  <div class="stats">
+    BACKEND <span id="st-backend">—</span><br>
+    PARTICLES <span id="st-count">—</span><br>
+    FPS <span id="st-fps">—</span><br>
+    GPU MS <span id="st-ms">—</span>
+  </div>
+</div>
+
+<div class="hud top-right hidden" id="hud-right">
+  <span class="badge" id="badge">DETECTING…</span>
+</div>
+
+<div class="poem" id="poem"></div>
+
+<div class="dock hidden" id="dock">
+  <span class="lbl">MOOD</span>
+  <span class="chip" data-mood="dream">梦幻</span>
+  <span class="chip" data-mood="flame">火焰</span>
+  <span class="chip" data-mood="tech">科技</span>
+  <span class="chip" data-mood="aurora">极光</span>
+  <span class="sep"></span>
+  <span class="lbl">COUNT</span>
+  <span class="chip" data-count="low">25万</span>
+  <span class="chip" data-count="mid">50万</span>
+  <span class="chip" data-count="high">100万</span>
+  <span class="sep"></span>
+  <span class="chip" id="btn-burst">爆发</span>
+  <span class="chip" id="btn-poem">情话</span>
+  <span class="chip" id="btn-share">分享</span>
+</div>
+
+<script type="module">
+// ============================================================
+//  顶级 GPU 粒子引擎 — WebGPU (Compute Shader, Ping-Pong)
+//  自动降级到 WebGL2 (Transform Feedback / GPGPU)
+//  单文件自包含，去网吧 Chrome/Edge 打开即满血
+// ============================================================
+
+// ---------- 0. 通用工具 ----------
+const $ = (id) => document.getElementById(id);
+const TAU = Math.PI * 2;
+
+// 基于 URL 的可分享种子
+const urlParams = new URLSearchParams(location.search);
+let SEED = urlParams.get('seed') || Math.random().toString(36).slice(2, 9);
+let MOOD = urlParams.get('mood') || 'dream';
+let COUNT_KEY = urlParams.get('count') || 'mid';
+
+const COUNT_MAP = { low: 250000, mid: 500000, high: 1000000 };
+
+// 字符串种子 -> 数字 (mulberry32)
+function hashSeed(str){
+  let h = 1779033703 ^ str.length;
+  for (let i=0;i<str.length;i++){ h = Math.imul(h ^ str.charCodeAt(i), 3432918353); h = h<<13 | h>>>19; }
+  return function(){ h = Math.imul(h ^ h>>>16, 2246822507); h = Math.imul(h ^ h>>>13, 3266489909); return ((h ^= h>>>16)>>>0)/4294967296; };
+}
+
+// 情绪配色 (HDR 色，可 >1)
+const MOODS = {
+  dream:  { a:[0.45,0.75,1.6], b:[0.85,0.55,1.7], c:[1.5,1.3,2.0], swirl:1.0, speed:0.7, name:'梦幻' },
+  flame:  { a:[2.0,0.7,0.2],  b:[1.9,0.35,0.15], c:[2.2,1.4,0.4], swirl:1.6, speed:1.5, name:'火焰' },
+  tech:   { a:[0.2,1.4,1.6],  b:[0.3,0.9,2.0],  c:[0.7,1.8,1.9], swirl:0.7, speed:1.1, name:'科技' },
+  aurora: { a:[0.3,1.7,1.0],  b:[0.5,1.2,1.8],  c:[1.2,1.9,0.9], swirl:1.2, speed:0.9, name:'极光' },
+};
+
+// 情话库 (模板 + 随机词，每次不同)
+const POEM = {
+  subj: ['我','这颗心','整片星河','所有的光','风经过时'],
+  verb: ['想你','为你亮着','向你靠近','记得你','慢慢落下'],
+  tail: ['在每一个平凡的日子','像粒子奔向引力','直到时间也温柔','和你在一起真好','一万次也愿意'],
+};
+function makePoem(rnd){
+  const pick = (arr) => arr[(rnd()*arr.length)|0];
+  return pick(POEM.subj) + pick(POEM.verb) + '，' + pick(POEM.tail);
+}
+
+// ---------- 1. 状态 ----------
+let backend = null;       // 'webgpu' | 'webgl'
+let particleCount = COUNT_MAP[COUNT_KEY];
+const pointer = { x:0, y:0, active:0, down:0 };
+let burst = 0;            // 爆发脉冲
+const canvas = $('gpu-canvas');
+
+// 时间系统：根据本地时间给基础氛围
+function timeAmbient(){
+  const h = new Date().getHours();
+  if (h>=5 && h<11)  return { tint:[1.05,1.0,0.95], label:'morning' };
+  if (h>=11 && h<17) return { tint:[1.0,1.0,1.05],  label:'day' };
+  if (h>=17 && h<21) return { tint:[1.1,0.95,1.0],  label:'dusk' };
+  return { tint:[0.9,0.95,1.15], label:'night' };
+}
+
+// ---------- 2. 指针交互 ----------
+function setupPointer(){
+  const move = (cx, cy) => {
+    const r = canvas.getBoundingClientRect();
+    pointer.x = ((cx - r.left)/r.width)*2 - 1;
+    pointer.y = -(((cy - r.top)/r.height)*2 - 1);
+    pointer.active = 1;
+  };
+  window.addEventListener('mousemove', e => move(e.clientX, e.clientY));
+  window.addEventListener('mousedown', () => pointer.down = 1);
+  window.addEventListener('mouseup',   () => pointer.down = 0);
+  window.addEventListener('mouseleave',() => pointer.active = 0);
+  window.addEventListener('touchmove', e => { if(e.touches[0]){ move(e.touches[0].clientX, e.touches[0].clientY); pointer.down=1; } }, {passive:true});
+  window.addEventListener('touchstart',e => { if(e.touches[0]){ move(e.touches[0].clientX, e.touches[0].clientY); pointer.down=1; } }, {passive:true});
+  window.addEventListener('touchend',  () => { pointer.down=0; pointer.active=0; });
+}
+
+// ---------- 3. UI 绑定 ----------
+function setupUI(){
+  document.querySelectorAll('[data-mood]').forEach(el=>{
+    el.classList.toggle('on', el.dataset.mood===MOOD);
+    el.onclick = ()=>{ MOOD=el.dataset.mood; document.querySelectorAll('[data-mood]').forEach(x=>x.classList.toggle('on',x===el)); if(engine) engine.setMood(MOODS[MOOD]); };
+  });
+  document.querySelectorAll('[data-count]').forEach(el=>{
+    el.classList.toggle('on', el.dataset.count===COUNT_KEY);
+    el.onclick = ()=>{
+      COUNT_KEY=el.dataset.count; particleCount=COUNT_MAP[COUNT_KEY];
+      document.querySelectorAll('[data-count]').forEach(x=>x.classList.toggle('on',x===el));
+      if(engine) engine.setCount(particleCount);
+      $('st-count').textContent = fmt(particleCount);
+    };
+  });
+  $('btn-burst').onclick = ()=>{ burst = 1.0; };
+  $('btn-poem').onclick  = ()=>{ showPoem(); };
+  $('btn-share').onclick = ()=>{
+    const url = `${location.origin}${location.pathname}?seed=${SEED}&mood=${MOOD}&count=${COUNT_KEY}`;
+    navigator.clipboard?.writeText(url).then(
+      ()=>flash($('btn-share'),'已复制'),
+      ()=>prompt('复制此链接分享：', url)
+    );
+  };
+}
+function flash(el, txt){ const o=el.textContent; el.textContent=txt; setTimeout(()=>el.textContent=o,1400); }
+function fmt(n){ return n>=10000 ? (n/10000)+'万' : n; }
+
+let poemTimer=null;
+function showPoem(){
+  const rnd = hashSeed(SEED + Date.now());
+  const p = $('poem'); p.textContent = makePoem(rnd); p.classList.add('show');
+  clearTimeout(poemTimer); poemTimer=setTimeout(()=>p.classList.remove('show'), 4200);
+}
+
+// ============================================================
+//  WebGPU 引擎
+// ============================================================
+class WebGPUEngine {
+  constructor(device, ctx, format){ this.device=device; this.ctx=ctx; this.format=format; this.mood=MOODS[MOOD]; }
+
+  async init(count){
+    const d = this.device;
+    this.count = count;
+    this.time = 0;
+
+    // 粒子结构: pos.xy, vel.xy, life, seed, _pad0, _pad1  => 8 floats = 32 bytes
+    this.STRIDE = 8;
+    const initData = this._spawn(count);
+
+    this.buffers = [0,1].map(()=> d.createBuffer({
+      size: count * this.STRIDE * 4,
+      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
+    }));
+    d.queue.writeBuffer(this.buffers[0], 0, initData);
+    d.queue.writeBuffer(this.buffers[1], 0, initData);
+    this.cur = 0;
+
+    // uniforms: dt,time,count,aspect, pointer.xy,pAct,pDown, swirl,speed,burst,_p, colA.xyz,_, colB.xyz,_, colC.xyz,_, tint.xyz,_
+    this.uboSize = 4*4 *  (1+1+1+1+1+1+1) ; // generous
+    this.ubo = d.createBuffer({ size: 256, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+
+    this._buildCompute();
+    this._buildRender();
+    this._buildBloom();
+
+    this._resize();
+    window.addEventListener('resize', ()=>this._resize());
+  }
+
+  _spawn(count){
+    const rnd = hashSeed(SEED);
+    const arr = new Float32Array(count * this.STRIDE);
+    for(let i=0;i<count;i++){
+      const o=i*this.STRIDE;
+      // 初始撒在圆盘
+      const a = rnd()*TAU, r = Math.sqrt(rnd())*0.9;
+      arr[o+0]=Math.cos(a)*r; arr[o+1]=Math.sin(a)*r;
+      arr[o+2]=0; arr[o+3]=0;
+      arr[o+4]=rnd();            // life phase
+      arr[o+5]=rnd();            // per-particle seed
+    }
+    return arr;
+  }
+
+  _buildCompute(){
+    const d=this.device;
+    const code = /* wgsl */`
+struct P { pos:vec2<f32>, vel:vec2<f32>, life:f32, seed:f32, p0:f32, p1:f32 };
+struct Sim {
+  dt:f32, time:f32, count:f32, aspect:f32,
+  ptr:vec2<f32>, pAct:f32, pDown:f32,
+  swirl:f32, speed:f32, burst:f32, pad:f32,
+};
+@group(0) @binding(0) var<storage, read> inp : array<P>;
+@group(0) @binding(1) var<storage, read_write> outp : array<P>;
+@group(0) @binding(2) var<uniform> S : Sim;
+
+fn hash3(p:vec3<f32>)->vec3<f32>{
+  var q=vec3<f32>(dot(p,vec3<f32>(127.1,311.7,74.7)),
+                  dot(p,vec3<f32>(269.5,183.3,246.1)),
+                  dot(p,vec3<f32>(113.5,271.9,124.6)));
+  return -1.0+2.0*fract(sin(q)*43758.5453123);
+}
+fn noise3(p:vec3<f32>)->f32{
+  let i=floor(p); let f=fract(p); let u=f*f*(3.0-2.0*f);
+  return mix(mix(mix(dot(hash3(i+vec3<f32>(0.,0.,0.)),f-vec3<f32>(0.,0.,0.)),
+                     dot(hash3(i+vec3<f32>(1.,0.,0.)),f-vec3<f32>(1.,0.,0.)),u.x),
+                 mix(dot(hash3(i+vec3<f32>(0.,1.,0.)),f-vec3<f32>(0.,1.,0.)),
+                     dot(hash3(i+vec3<f32>(1.,1.,0.)),f-vec3<f32>(1.,1.,0.)),u.x),u.y),
+             mix(mix(dot(hash3(i+vec3<f32>(0.,0.,1.)),f-vec3<f32>(0.,0.,1.)),
+                     dot(hash3(i+vec3<f32>(1.,0.,1.)),f-vec3<f32>(1.,0.,1.)),u.x),
+                 mix(dot(hash3(i+vec3<f32>(0.,1.,1.)),f-vec3<f32>(0.,1.,1.)),
+                     dot(hash3(i+vec3<f32>(1.,1.,1.)),f-vec3<f32>(1.,1.,1.)),u.x),u.y),u.z);
+}
+// Curl noise (2D, derived from 3D potential)
+fn curl(p:vec2<f32>, t:f32)->vec2<f32>{
+  let e=0.1;
+  let n1=noise3(vec3<f32>(p.x, p.y+e, t));
+  let n2=noise3(vec3<f32>(p.x, p.y-e, t));
+  let n3=noise3(vec3<f32>(p.x+e, p.y, t));
+  let n4=noise3(vec3<f32>(p.x-e, p.y, t));
+  let dx=(n1-n2)/(2.0*e);
+  let dy=(n3-n4)/(2.0*e);
+  return vec2<f32>(dx, -dy);
+}
+
+@compute @workgroup_size(256)
+fn main(@builtin(global_invocation_id) gid:vec3<u32>){
+  let i=gid.x;
+  if(i >= u32(S.count)){ return; }
+  var p = inp[i];
+
+  // Curl 噪声流场
+  let f = curl(p.pos*1.5 + vec2<f32>(p.seed*10.0), S.time*0.15) * S.swirl;
+  p.vel += f * S.dt * 1.2;
+
+  // 指针吸引/排斥
+  if(S.pAct > 0.5){
+    let d = S.ptr - p.pos;
+    let dist = length(d) + 0.001;
+    let dir = d/dist;
+    let fall = clamp(1.0 - dist/1.2, 0.0, 1.0);
+    // 按住=排斥, 悬停=吸引
+    let sign = select(1.0, -2.0, S.pDown > 0.5);
+    p.vel += dir * fall * fall * sign * S.dt * 3.0;
+  }
+
+  // 爆发脉冲：从中心向外炸
+  if(S.burst > 0.01){
+    let d = p.pos;
+    let dist = length(d)+0.001;
+    p.vel += (d/dist) * S.burst * S.dt * 14.0 * (0.5 + p.seed);
+  }
+
+  // 向心回归（保持成团，不飞散）
+  p.vel += (-p.pos) * S.dt * 0.5;
+
+  // 阻尼 + 积分（半隐式 Euler）
+  p.vel *= 0.97;
+  p.pos += p.vel * S.dt * S.speed;
+
+  // 生命循环（用于颜色脉动）
+  p.life += S.dt * 0.25;
+  if(p.life > 1.0){ p.life -= 1.0; }
+
+  // 软边界
+  let lim = 1.7;
+  if(abs(p.pos.x) > lim){ p.pos.x = clamp(p.pos.x,-lim,lim); p.vel.x *= -0.6; }
+  if(abs(p.pos.y) > lim){ p.pos.y = clamp(p.pos.y,-lim,lim); p.vel.y *= -0.6; }
+
+  outp[i]=p;
+}`;
+    const mod = d.createShaderModule({ code });
+    this.computePipe = d.createComputePipeline({ layout:'auto', compute:{ module:mod, entryPoint:'main' } });
+  }
+
+  _buildRender(){
+    const d=this.device;
+    const code = /* wgsl */`
+struct Sim {
+  dt:f32, time:f32, count:f32, aspect:f32,
+  ptr:vec2<f32>, pAct:f32, pDown:f32,
+  swirl:f32, speed:f32, burst:f32, pad:f32,
+  colA:vec4<f32>, colB:vec4<f32>, colC:vec4<f32>, tint:vec4<f32>,
+};
+@group(0) @binding(0) var<uniform> S : Sim;
+
+struct VSOut { @builtin(position) pos:vec4<f32>, @location(0) col:vec3<f32>, @location(1) a:f32 };
+
+@vertex
+fn vs(@location(0) pos:vec2<f32>, @location(1) vel:vec2<f32>,
+      @location(2) life:f32, @location(3) seed:f32) -> VSOut {
+  var o:VSOut;
+  let x = pos.x / S.aspect;
+  o.pos = vec4<f32>(x, pos.y, 0.0, 1.0);
+
+  // 速度 -> 颜色混合 + 生命脉动
+  let spd = clamp(length(vel)*2.5, 0.0, 1.0);
+  let ph = 0.5 + 0.5*sin(life*6.2831 + seed*6.0);
+  var c = mix(S.colA.rgb, S.colB.rgb, spd);
+  c = mix(c, S.colC.rgb, ph*0.6);
+  c *= S.tint.rgb;
+  o.col = c;
+
+  o.a = 0.35 + 0.65*ph;
+  return o;
+}
+
+@fragment
+fn fs(i:VSOut) -> @location(0) vec4<f32> {
+  return vec4<f32>(i.col * i.a, i.a);
+}`;
+    const mod = d.createShaderModule({ code });
+    this.renderPipe = d.createRenderPipeline({
+      layout:'auto',
+      vertex:{ module:mod, entryPoint:'vs', buffers:[{
+        arrayStride: this.STRIDE*4, stepMode:'vertex',
+        attributes:[
+          {shaderLocation:0, offset:0,  format:'float32x2'},
+          {shaderLocation:1, offset:8,  format:'float32x2'},
+          {shaderLocation:2, offset:16, format:'float32'},
+          {shaderLocation:3, offset:20, format:'float32'},
+        ]
+      }]},
+      fragment:{ module:mod, entryPoint:'fs', targets:[{
+        format:'rgba16float',
+        blend:{ color:{srcFactor:'one',dstFactor:'one'}, alpha:{srcFactor:'one',dstFactor:'one'} },
+      }]},
+      primitive:{ topology:'point-list' },
+    });
+  }
+
+  _buildBloom(){
+    const d=this.device;
+    // HDR 场景纹理 + 两次模糊 + 合成（简化高质量 bloom）
+    this.blurCode = /* wgsl */`
+@group(0) @binding(0) var samp:sampler;
+@group(0) @binding(1) var tex:texture_2d<f32>;
+struct U { dir:vec2<f32>, _p:vec2<f32> };
+@group(0) @binding(2) var<uniform> U0:U;
+struct VSOut{ @builtin(position) pos:vec4<f32>, @location(0) uv:vec2<f32> };
+@vertex fn vs(@builtin(vertex_index) vi:u32)->VSOut{
+  var p=array<vec2<f32>,3>(vec2<f32>(-1.,-1.),vec2<f32>(3.,-1.),vec2<f32>(-1.,3.));
+  var o:VSOut; o.pos=vec4<f32>(p[vi],0.,1.); o.uv=0.5*(p[vi]+vec2<f32>(1.,1.)); o.uv.y=1.0-o.uv.y; return o;
+}
+@fragment fn fs(i:VSOut)->@location(0) vec4<f32>{
+  let texel=U0.dir;
+  var sum=vec3<f32>(0.);
+  let w=array<f32,5>(0.227,0.194,0.121,0.054,0.016);
+  sum += textureSample(tex,samp,i.uv).rgb * w[0];
+  for(var k=1;k<5;k++){
+    let off=texel*f32(k);
+    sum += textureSample(tex,samp,i.uv+off).rgb * w[k];
+    sum += textureSample(tex,samp,i.uv-off).rgb * w[k];
+  }
+  return vec4<f32>(sum,1.0);
+}`;
+    this.bright = /* wgsl */`
+@group(0) @binding(0) var samp:sampler;
+@group(0) @binding(1) var tex:texture_2d<f32>;
+struct VSOut{ @builtin(position) pos:vec4<f32>, @location(0) uv:vec2<f32> };
+@vertex fn vs(@builtin(vertex_index) vi:u32)->VSOut{
+  var p=array<vec2<f32>,3>(vec2<f32>(-1.,-1.),vec2<f32>(3.,-1.),vec2<f32>(-1.,3.));
+  var o:VSOut; o.pos=vec4<f32>(p[vi],0.,1.); o.uv=0.5*(p[vi]+vec2<f32>(1.,1.)); o.uv.y=1.0-o.uv.y; return o;
+}
+@fragment fn fs(i:VSOut)->@location(0) vec4<f32>{
+  let c=textureSample(tex,samp,i.uv).rgb;
+  let b=max(c-vec3<f32>(0.6),vec3<f32>(0.));
+  return vec4<f32>(b,1.0);
+}`;
+    this.composite = /* wgsl */`
+@group(0) @binding(0) var samp:sampler;
+@group(0) @binding(1) var sceneT:texture_2d<f32>;
+@group(0) @binding(2) var bloomT:texture_2d<f32>;
+struct VSOut{ @builtin(position) pos:vec4<f32>, @location(0) uv:vec2<f32> };
+@vertex fn vs(@builtin(vertex_index) vi:u32)->VSOut{
+  var p=array<vec2<f32>,3>(vec2<f32>(-1.,-1.),vec2<f32>(3.,-1.),vec2<f32>(-1.,3.));
+  var o:VSOut; o.pos=vec4<f32>(p[vi],0.,1.); o.uv=0.5*(p[vi]+vec2<f32>(1.,1.)); o.uv.y=1.0-o.uv.y; return o;
+}
+fn aces(x:vec3<f32>)->vec3<f32>{
+  let a=2.51;let b=0.03;let c=2.43;let d=0.59;let e=0.14;
+  return clamp((x*(a*x+b))/(x*(c*x+d)+e),vec3<f32>(0.),vec3<f32>(1.));
+}
+@fragment fn fs(i:VSOut)->@location(0) vec4<f32>{
+  let s=textureSample(sceneT,samp,i.uv).rgb;
+  let bl=textureSample(bloomT,samp,i.uv).rgb;
+  var col=s + bl*1.4;
+  col=aces(col*1.15);
+  // 轻微暗角
+  let d=distance(i.uv,vec2<f32>(0.5));
+  col*= smoothstep(0.95,0.35,d)*0.5+0.6;
+  return vec4<f32>(col,1.0);
+}`;
+    const mk=(code)=>d.createShaderModule({code});
+    this.samp = d.createSampler({magFilter:'linear',minFilter:'linear',addressModeU:'clamp-to-edge',addressModeV:'clamp-to-edge'});
+
+    this.brightPipe = d.createRenderPipeline({layout:'auto',vertex:{module:mk(this.bright),entryPoint:'vs'},fragment:{module:mk(this.bright),entryPoint:'fs',targets:[{format:'rgba16float'}]},primitive:{topology:'triangle-list'}});
+    this.blurPipe   = d.createRenderPipeline({layout:'auto',vertex:{module:mk(this.blurCode),entryPoint:'vs'},fragment:{module:mk(this.blurCode),entryPoint:'fs',targets:[{format:'rgba16float'}]},primitive:{topology:'triangle-list'}});
+    this.compPipe   = d.createRenderPipeline({layout:'auto',vertex:{module:mk(this.composite),entryPoint:'vs'},fragment:{module:mk(this.composite),entryPoint:'fs',targets:[{format:this.format}]},primitive:{topology:'triangle-list'}});
+
+    // blur dir uniforms
+    this.blurUboH=d.createBuffer({size:16,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST});
+    this.blurUboV=d.createBuffer({size:16,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST});
+  }
+
+  _resize(){
+    const dpr=Math.min(devicePixelRatio||1, 2);
+    this.W=Math.floor(innerWidth*dpr); this.H=Math.floor(innerHeight*dpr);
+    canvas.width=this.W; canvas.height=this.H;
+    canvas.style.width=innerWidth+'px'; canvas.style.height=innerHeight+'px';
+    this.aspect=this.W/this.H;
+    const d=this.device;
+    const mkTex=(w,h)=>d.createTexture({size:[w,h],format:'rgba16float',usage:GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.TEXTURE_BINDING});
+    this.sceneTex=mkTex(this.W,this.H);
+    const bw=Math.max(1,this.W>>1), bh=Math.max(1,this.H>>1);
+    this.brightTex=mkTex(bw,bh); this.blurTex=mkTex(bw,bh);
+    this.bw=bw; this.bh=bh;
+    d.queue.writeBuffer(this.blurUboH,0,new Float32Array([1.0/bw,0,0,0]));
+    d.queue.writeBuffer(this.blurUboV,0,new Float32Array([0,1.0/bh,0,0]));
+  }
+
+  setMood(m){ this.mood=m; }
+  setCount(n){
+    // 重建粒子缓冲
+    this.count=n;
+    const initData=this._spawn(n);
+    this.buffers.forEach(b=>b.destroy && b.destroy());
+    const d=this.device;
+    this.buffers=[0,1].map(()=>d.createBuffer({size:n*this.STRIDE*4,usage:GPUBufferUsage.STORAGE|GPUBufferUsage.VERTEX|GPUBufferUsage.COPY_DST}));
+    d.queue.writeBuffer(this.buffers[0],0,initData);
+    d.queue.writeBuffer(this.buffers[1],0,initData);
+    this.cur=0;
+  }
+
+  frame(dt){
+    const d=this.device, m=this.mood, amb=timeAmbient();
+    this.time+=dt;
+    if(burst>0){ burst=Math.max(0,burst-dt*1.5); }
+
+    // 更新 uniform
+    const u=new Float32Array(64);
+    u[0]=dt; u[1]=this.time; u[2]=this.count; u[3]=this.aspect;
+    u[4]=pointer.x; u[5]=pointer.y; u[6]=pointer.active; u[7]=pointer.down;
+    u[8]=m.swirl; u[9]=m.speed; u[10]=burst; u[11]=0;
+    u[12]=m.a[0];u[13]=m.a[1];u[14]=m.a[2];u[15]=1;
+    u[16]=m.b[0];u[17]=m.b[1];u[18]=m.b[2];u[19]=1;
+    u[20]=m.c[0];u[21]=m.c[1];u[22]=m.c[2];u[23]=1;
+    u[24]=amb.tint[0];u[25]=amb.tint[1];u[26]=amb.tint[2];u[27]=1;
+    d.queue.writeBuffer(this.ubo,0,u);
+
+    const enc=d.createCommandEncoder();
+
+    // --- compute ---
+    const inB=this.buffers[this.cur], outB=this.buffers[this.cur^1];
+    const cbg=d.createBindGroup({layout:this.computePipe.getBindGroupLayout(0),entries:[
+      {binding:0,resource:{buffer:inB}},{binding:1,resource:{buffer:outB}},{binding:2,resource:{buffer:this.ubo}}]});
+    const cp=enc.beginComputePass();
+    cp.setPipeline(this.computePipe); cp.setBindGroup(0,cbg);
+    cp.dispatchWorkgroups(Math.ceil(this.count/256)); cp.end();
+    this.cur^=1;
+
+    // --- render particles to HDR scene ---
+    const rbg=d.createBindGroup({layout:this.renderPipe.getBindGroupLayout(0),entries:[{binding:0,resource:{buffer:this.ubo}}]});
+    const rp=enc.beginRenderPass({colorAttachments:[{view:this.sceneTex.createView(),clearValue:{r:0.015,g:0.02,b:0.05,a:1},loadOp:'clear',storeOp:'store'}]});
+    rp.setPipeline(this.renderPipe); rp.setBindGroup(0,rbg);
+    rp.setVertexBuffer(0,this.buffers[this.cur]); rp.draw(this.count); rp.end();
+
+    // --- bright pass ---
+    const bbg=d.createBindGroup({layout:this.brightPipe.getBindGroupLayout(0),entries:[{binding:0,resource:this.samp},{binding:1,resource:this.sceneTex.createView()}]});
+    const bp=enc.beginRenderPass({colorAttachments:[{view:this.brightTex.createView(),clearValue:{r:0,g:0,b:0,a:1},loadOp:'clear',storeOp:'store'}]});
+    bp.setPipeline(this.brightPipe); bp.setBindGroup(0,bbg); bp.draw(3); bp.end();
+
+    // --- blur H (bright->blur) ---
+    const hbg=d.createBindGroup({layout:this.blurPipe.getBindGroupLayout(0),entries:[{binding:0,resource:this.samp},{binding:1,resource:this.brightTex.createView()},{binding:2,resource:{buffer:this.blurUboH}}]});
+    const hp=enc.beginRenderPass({colorAttachments:[{view:this.blurTex.createView(),clearValue:{r:0,g:0,b:0,a:1},loadOp:'clear',storeOp:'store'}]});
+    hp.setPipeline(this.blurPipe); hp.setBindGroup(0,hbg); hp.draw(3); hp.end();
+
+    // --- blur V (blur->bright) ---
+    const vbg=d.createBindGroup({layout:this.blurPipe.getBindGroupLayout(0),entries:[{binding:0,resource:this.samp},{binding:1,resource:this.blurTex.createView()},{binding:2,resource:{buffer:this.blurUboV}}]});
+    const vp=enc.beginRenderPass({colorAttachments:[{view:this.brightTex.createView(),clearValue:{r:0,g:0,b:0,a:1},loadOp:'clear',storeOp:'store'}]});
+    vp.setPipeline(this.blurPipe); vp.setBindGroup(0,vbg); vp.draw(3); vp.end();
+
+    // --- composite to screen ---
+    const scbg=d.createBindGroup({layout:this.compPipe.getBindGroupLayout(0),entries:[{binding:0,resource:this.samp},{binding:1,resource:this.sceneTex.createView()},{binding:2,resource:this.brightTex.createView()}]});
+    const sp=enc.beginRenderPass({colorAttachments:[{view:this.ctx.getCurrentTexture().createView(),clearValue:{r:0,g:0,b:0,a:1},loadOp:'clear',storeOp:'store'}]});
+    sp.setPipeline(this.compPipe); sp.setBindGroup(0,scbg); sp.draw(3); sp.end();
+
+    d.queue.submit([enc.finish()]);
+  }
+}
+
+// ============================================================
+//  WebGL2 降级引擎 (Transform Feedback GPGPU)
+// ============================================================
+class WebGL2Engine {
+  constructor(gl){ this.gl=gl; this.mood=MOODS[MOOD]; }
+  async init(count){
+    const gl=this.gl;
+    this.count=Math.min(count, 600000); // WebGL 降级上限
+    this.time=0;
+    this._buildPrograms();
+    this._buildBuffers();
+    this._resize();
+    window.addEventListener('resize',()=>this._resize());
+  }
+  _sh(type,src){ const gl=this.gl,s=gl.createShader(type); gl.shaderSource(s,src); gl.compileShader(s);
+    if(!gl.getShaderParameter(s,gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s)); return s; }
+  _prog(vs,fs,varyings){
+    const gl=this.gl,p=gl.createProgram();
+    gl.attachShader(p,this._sh(gl.VERTEX_SHADER,vs)); gl.attachShader(p,this._sh(gl.FRAGMENT_SHADER,fs));
+    if(varyings) gl.transformFeedbackVaryings(p,varyings,gl.INTERLEAVED_ATTRIBS);
+    gl.linkProgram(p);
+    if(!gl.getProgramParameter(p,gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
+    return p;
+  }
+  _buildPrograms(){
+    const simVS=`#version 300 es
+precision highp float;
+layout(location=0) in vec2 a_pos;
+layout(location=1) in vec2 a_vel;
+layout(location=2) in vec2 a_meta; // life, seed
+uniform float u_dt,u_time,u_swirl,u_speed,u_burst,u_pAct,u_pDown;
+uniform vec2 u_ptr;
+out vec2 v_pos; out vec2 v_vel; out vec2 v_meta;
+vec3 hash3(vec3 p){ p=vec3(dot(p,vec3(127.1,311.7,74.7)),dot(p,vec3(269.5,183.3,246.1)),dot(p,vec3(113.5,271.9,124.6)));
+  return -1.0+2.0*fract(sin(p)*43758.5453123); }
+float noise3(vec3 p){ vec3 i=floor(p),f=fract(p),u=f*f*(3.0-2.0*f);
+  return mix(mix(mix(dot(hash3(i+vec3(0,0,0)),f-vec3(0,0,0)),dot(hash3(i+vec3(1,0,0)),f-vec3(1,0,0)),u.x),
+                 mix(dot(hash3(i+vec3(0,1,0)),f-vec3(0,1,0)),dot(hash3(i+vec3(1,1,0)),f-vec3(1,1,0)),u.x),u.y),
+             mix(mix(dot(hash3(i+vec3(0,0,1)),f-vec3(0,0,1)),dot(hash3(i+vec3(1,0,1)),f-vec3(1,0,1)),u.x),
+                 mix(dot(hash3(i+vec3(0,1,1)),f-vec3(0,1,1)),dot(hash3(i+vec3(1,1,1)),f-vec3(1,1,1)),u.x),u.y),u.z); }
+vec2 curl(vec2 p,float t){ float e=0.1;
+  float n1=noise3(vec3(p.x,p.y+e,t)),n2=noise3(vec3(p.x,p.y-e,t));
+  float n3=noise3(vec3(p.x+e,p.y,t)),n4=noise3(vec3(p.x-e,p.y,t));
+  return vec2((n1-n2)/(2.0*e), -(n3-n4)/(2.0*e)); }
+void main(){
+  vec2 pos=a_pos, vel=a_vel; float life=a_meta.x, seed=a_meta.y;
+  vel += curl(pos*1.5+vec2(seed*10.0), u_time*0.15)*u_swirl*u_dt*1.2;
+  if(u_pAct>0.5){ vec2 d=u_ptr-pos; float dist=length(d)+0.001; vec2 dir=d/dist;
+    float fall=clamp(1.0-dist/1.2,0.0,1.0); float sgn=(u_pDown>0.5)?-2.0:1.0;
+    vel += dir*fall*fall*sgn*u_dt*3.0; }
+  if(u_burst>0.01){ vec2 d=pos; float dist=length(d)+0.001; vel += (d/dist)*u_burst*u_dt*14.0*(0.5+seed); }
+  vel += (-pos)*u_dt*0.5;
+  vel *= 0.97;
+  pos += vel*u_dt*u_speed;
+  life += u_dt*0.25; if(life>1.0) life-=1.0;
+  float lim=1.7;
+  if(abs(pos.x)>lim){ pos.x=clamp(pos.x,-lim,lim); vel.x*=-0.6; }
+  if(abs(pos.y)>lim){ pos.y=clamp(pos.y,-lim,lim); vel.y*=-0.6; }
+  v_pos=pos; v_vel=vel; v_meta=vec2(life,seed);
+}`;
+    const simFS=`#version 300 es
+precision highp float; out vec4 o; void main(){ o=vec4(0.0); }`;
+    this.simProg=this._prog(simVS,simFS,['v_pos','v_vel','v_meta']);
+
+    const drawVS=`#version 300 es
+precision highp float;
+layout(location=0) in vec2 a_pos;
+layout(location=1) in vec2 a_vel;
+layout(location=2) in vec2 a_meta;
+uniform float u_aspect; uniform vec3 u_cA,u_cB,u_cC,u_tint;
+out vec3 v_col; out float v_a;
+void main(){
+  gl_Position=vec4(a_pos.x/u_aspect, a_pos.y, 0.0, 1.0);
+  gl_PointSize=1.5;
+  float spd=clamp(length(a_vel)*2.5,0.0,1.0);
+  float ph=0.5+0.5*sin(a_meta.x*6.2831+a_meta.y*6.0);
+  vec3 c=mix(u_cA,u_cB,spd); c=mix(c,u_cC,ph*0.6); c*=u_tint;
+  v_col=c; v_a=0.35+0.65*ph;
+}`;
+    const drawFS=`#version 300 es
+precision highp float; in vec3 v_col; in float v_a; out vec4 o;
+void main(){ o=vec4(v_col*v_a, v_a); }`;
+    this.drawProg=this._prog(drawVS,drawFS,null);
+  }
+  _buildBuffers(){
+    const gl=this.gl, n=this.count, rnd=hashSeed(SEED);
+    const data=new Float32Array(n*6);
+    for(let i=0;i<n;i++){ const o=i*6; const a=rnd()*TAU,r=Math.sqrt(rnd())*0.9;
+      data[o]=Math.cos(a)*r; data[o+1]=Math.sin(a)*r; data[o+2]=0; data[o+3]=0; data[o+4]=rnd(); data[o+5]=rnd(); }
+    this.bufs=[0,1].map(()=>{ const b=gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER,b); gl.bufferData(gl.ARRAY_BUFFER,data,gl.DYNAMIC_COPY); return b; });
+    this.vaos=[0,1].map(i=>{ const v=gl.createVertexArray(); gl.bindVertexArray(v); gl.bindBuffer(gl.ARRAY_BUFFER,this.bufs[i]);
+      const S=6*4; gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0,2,gl.FLOAT,false,S,0);
+      gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1,2,gl.FLOAT,false,S,8);
+      gl.enableVertexAttribArray(2); gl.vertexAttribPointer(2,2,gl.FLOAT,false,S,16); return v; });
+    this.tf=gl.createTransformFeedback(); this.cur=0;
+  }
+  _resize(){
+    const dpr=Math.min(devicePixelRatio||1,2);
+    this.W=Math.floor(innerWidth*dpr); this.H=Math.floor(innerHeight*dpr);
+    canvas.width=this.W; canvas.height=this.H; canvas.style.width=innerWidth+'px'; canvas.style.height=innerHeight+'px';
+    this.aspect=this.W/this.H; this.gl.viewport(0,0,this.W,this.H);
+  }
+  setMood(m){ this.mood=m; }
+  setCount(){ /* WebGL 降级保持当前数量，避免复杂重建 */ }
+  frame(dt){
+    const gl=this.gl, m=this.mood, amb=timeAmbient(); this.time+=dt;
+    if(burst>0) burst=Math.max(0,burst-dt*1.5);
+
+    // --- simulate via transform feedback ---
+    gl.useProgram(this.simProg);
+    const U=(n)=>gl.getUniformLocation(this.simProg,n);
+    gl.uniform1f(U('u_dt'),dt); gl.uniform1f(U('u_time'),this.time);
+    gl.uniform1f(U('u_swirl'),m.swirl); gl.uniform1f(U('u_speed'),m.speed); gl.uniform1f(U('u_burst'),burst);
+    gl.uniform1f(U('u_pAct'),pointer.active); gl.uniform1f(U('u_pDown'),pointer.down);
+    gl.uniform2f(U('u_ptr'),pointer.x,pointer.y);
+    gl.enable(gl.RASTERIZER_DISCARD);
+    gl.bindVertexArray(this.vaos[this.cur]);
+    gl.bindTransformFeedback(gl.TRANSFORM_FEEDBACK,this.tf);
+    gl.bindBufferBase(gl.TRANSFORM_FEEDBACK_BUFFER,0,this.bufs[this.cur^1]);
+    gl.beginTransformFeedback(gl.POINTS);
+    gl.drawArrays(gl.POINTS,0,this.count);
+    gl.endTransformFeedback();
+    gl.bindBufferBase(gl.TRANSFORM_FEEDBACK_BUFFER,0,null);
+    gl.disable(gl.RASTERIZER_DISCARD);
+    this.cur^=1;
+
+    // --- draw with additive blending ---
+    gl.bindFramebuffer(gl.FRAMEBUFFER,null);
+    gl.viewport(0,0,this.W,this.H);
+    gl.clearColor(0.015,0.02,0.05,1); gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.enable(gl.BLEND); gl.blendFunc(gl.ONE,gl.ONE);
+    gl.useProgram(this.drawProg);
+    const D=(n)=>gl.getUniformLocation(this.drawProg,n);
+    gl.uniform1f(D('u_aspect'),this.aspect);
+    gl.uniform3fv(D('u_cA'),m.a); gl.uniform3fv(D('u_cB'),m.b); gl.uniform3fv(D('u_cC'),m.c); gl.uniform3fv(D('u_tint'),amb.tint);
+    gl.bindVertexArray(this.vaos[this.cur]);
+    gl.drawArrays(gl.POINTS,0,this.count);
+    gl.disable(gl.BLEND);
+  }
+}
+
+// ============================================================
+//  启动 + 自动选择后端
+// ============================================================
+let engine=null;
+let lastT=performance.now(), fpsAcc=0, fpsN=0;
+
+async function boot(){
+  setupPointer(); setupUI();
+
+  // 尝试 WebGPU
+  if(navigator.gpu){
+    try{
+      const adapter=await navigator.gpu.requestAdapter({powerPreference:'high-performance'});
+      if(adapter){
+        const device=await adapter.requestDevice();
+        const ctx=canvas.getContext('webgpu');
+        const format=navigator.gpu.getPreferredCanvasFormat();
+        ctx.configure({device,format,alphaMode:'opaque'});
+        engine=new WebGPUEngine(device,ctx,format);
+        await engine.init(particleCount);
+        backend='webgpu';
+      }
+    }catch(e){ console.warn('WebGPU init failed, fallback to WebGL2:',e); engine=null; }
+  }
+
+  // 降级 WebGL2
+  if(!engine){
+    const gl=canvas.getContext('webgl2',{antialias:false,alpha:false,premultipliedAlpha:false});
+    if(!gl){ showUnsupported(); return; }
+    engine=new WebGL2Engine(gl);
+    await engine.init(particleCount);
+    backend='webgl';
+  }
+
+  // UI 状态
+  $('loading').classList.add('hidden');
+  $('hud-left').classList.remove('hidden');
+  $('hud-right').classList.remove('hidden');
+  $('dock').classList.remove('hidden');
+  const badge=$('badge');
+  if(backend==='webgpu'){ badge.textContent='WebGPU · COMPUTE'; badge.className='badge webgpu'; $('st-backend').textContent='WebGPU'; }
+  else { badge.textContent='WebGL2 · FALLBACK'; badge.className='badge webgl'; $('st-backend').textContent='WebGL2'; particleCount=engine.count; }
+  $('st-count').textContent=fmt(particleCount);
+
+  // 首屏来一句情话
+  setTimeout(showPoem, 800);
+
+  requestAnimationFrame(loop);
+}
+
+function loop(now){
+  let dt=(now-lastT)/1000; lastT=now;
+  if(dt>0.05) dt=0.05; // 防卡顿大跳
+  engine.frame(dt);
+
+  // FPS 统计
+  fpsAcc+=dt; fpsN++;
+  if(fpsAcc>=0.5){
+    const fps=Math.round(fpsN/fpsAcc);
+    $('st-fps').textContent=fps;
+    $('st-ms').textContent=(fpsAcc/fpsN*1000).toFixed(1);
+    fpsAcc=0; fpsN=0;
+  }
+  requestAnimationFrame(loop);
+}
+
+function showUnsupported(){
+  $('loading').innerHTML='<h2>浏览器不支持 WebGPU / WebGL2</h2>'+
+    '<p>请用最新版 <b>Chrome</b> 或 <b>Edge</b> 打开以体验满血 GPU 粒子引擎。<br>'+
+    '（去网吧的电脑用 Chrome 打开效果最佳，可跑百万粒子）</p>';
+}
+
+boot();
+</script>
+</body>
+</html>

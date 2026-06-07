@@ -1,0 +1,808 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>with you</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{width:100vw;height:100vh;overflow:hidden;background:#000008;font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display',sans-serif;}
+#c{position:fixed;inset:0;z-index:0;}
+#videoel{position:fixed;top:-9999px;left:-9999px;width:320px;height:240px;object-fit:cover;}
+
+header{
+  position:fixed;top:0;left:0;right:0;z-index:100;
+  padding:14px 22px;
+  display:flex;align-items:center;justify-content:space-between;
+  background:rgba(0,0,8,0.35);
+  backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+  border-bottom:1px solid rgba(255,255,255,0.06);
+}
+.logo{
+  font-size:17px;font-weight:700;letter-spacing:-0.3px;
+  background:linear-gradient(90deg,#a8d8ff,#c084fc,#f472b6);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+}
+.header-btns{display:flex;gap:8px;align-items:center;}
+.cam-btn{
+  padding:7px 15px;
+  background:rgba(168,216,255,0.07);
+  border:1px solid rgba(168,216,255,0.18);
+  border-radius:20px;color:rgba(168,216,255,0.55);
+  font-size:12px;font-weight:500;cursor:pointer;transition:all 0.3s;
+}
+.cam-btn.active{
+  background:rgba(168,216,255,0.15);
+  border-color:rgba(168,216,255,0.55);
+  color:rgba(168,216,255,1);
+  box-shadow:0 0 14px rgba(168,216,255,0.2);
+}
+.gallery-btn,.logout-btn{
+  padding:7px 15px;
+  background:rgba(255,255,255,0.04);
+  border:1px solid rgba(255,255,255,0.08);
+  border-radius:20px;color:rgba(255,255,255,0.35);
+  font-size:12px;font-weight:500;cursor:pointer;transition:all 0.2s;
+}
+.cam-status{
+  position:fixed;top:58px;left:50%;transform:translateX(-50%);
+  z-index:101;padding:5px 16px;border-radius:20px;
+  background:rgba(168,216,255,0.1);border:1px solid rgba(168,216,255,0.2);
+  color:rgba(168,216,255,0.8);font-size:11px;letter-spacing:0.3px;
+  opacity:0;transition:opacity 0.4s;pointer-events:none;white-space:nowrap;
+}
+.cam-status.show{opacity:1;}
+.gesture-indicator{
+  position:fixed;bottom:80px;left:50%;transform:translateX(-50%);
+  z-index:101;padding:6px 18px;border-radius:20px;
+  background:rgba(0,0,0,0.4);border:1px solid rgba(255,255,255,0.1);
+  color:rgba(255,255,255,0.5);font-size:12px;letter-spacing:0.3px;
+  opacity:0;transition:opacity 0.4s;pointer-events:none;
+  backdrop-filter:blur(10px);
+}
+.gesture-indicator.show{opacity:1;}
+
+.gallery-overlay{
+  position:fixed;inset:0;z-index:200;
+  background:rgba(0,0,8,0.93);
+  backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);
+  display:none;overflow-y:auto;padding:70px 20px 40px;
+}
+.gallery-overlay.open{display:block;}
+.gallery-close{
+  position:fixed;top:16px;right:20px;z-index:201;
+  width:34px;height:34px;border-radius:50%;
+  background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.1);
+  color:rgba(255,255,255,0.5);font-size:16px;
+  display:none;align-items:center;justify-content:center;cursor:pointer;
+}
+.gallery-close.show{display:flex;}
+.gallery{columns:3 180px;column-gap:10px;}
+.img-wrap{break-inside:avoid;margin-bottom:10px;border-radius:12px;overflow:hidden;position:relative;cursor:pointer;border:1px solid rgba(255,255,255,0.05);transition:transform 0.3s cubic-bezier(0.34,1.56,0.64,1);}
+.img-wrap:hover{transform:scale(1.03);}
+.img-wrap img{width:100%;display:block;}
+.overlay-text{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.55);color:white;font-size:12px;font-weight:500;opacity:0;transition:opacity 0.3s;text-align:center;padding:10px;}
+.img-wrap.show-text .overlay-text{opacity:1;}
+.empty{text-align:center;padding:60px 20px;color:rgba(255,255,255,0.15);font-size:14px;}
+
+.upload-fab{
+  position:fixed;bottom:28px;right:22px;z-index:150;
+  width:46px;height:46px;border-radius:50%;
+  background:linear-gradient(135deg,#a8d8ff,#a78bfa);
+  border:none;color:white;font-size:20px;
+  cursor:pointer;transition:all 0.25s;
+  box-shadow:0 4px 18px rgba(168,216,255,0.25);
+  display:flex;align-items:center;justify-content:center;
+}
+.modal{display:none;position:fixed;inset:0;z-index:300;align-items:center;justify-content:center;background:rgba(0,0,0,0.75);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);}
+.modal.open{display:flex;}
+.modal-card{background:rgba(8,8,20,0.92);backdrop-filter:blur(30px);-webkit-backdrop-filter:blur(30px);border:1px solid rgba(255,255,255,0.08);border-radius:22px;padding:32px;width:300px;box-shadow:0 20px 60px rgba(0,0,0,0.7);animation:cardIn 0.4s cubic-bezier(0.34,1.56,0.64,1);text-align:center;}
+@keyframes cardIn{from{opacity:0;transform:scale(0.85)}to{opacity:1;transform:scale(1)}}
+.modal-card h2{font-size:16px;font-weight:600;color:rgba(255,255,255,0.8);margin-bottom:16px;}
+.drop-zone{border:1.5px dashed rgba(168,216,255,0.18);border-radius:12px;padding:24px 16px;margin-bottom:14px;cursor:pointer;color:rgba(255,255,255,0.2);font-size:13px;transition:all 0.2s;}
+.drop-zone input{display:none;}
+.modal-btns{display:flex;gap:8px;}
+.modal-btns button{flex:1;padding:10px;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;border:none;transition:all 0.2s;}
+.btn-upload{background:linear-gradient(135deg,#a8d8ff,#a78bfa);color:white;}
+.btn-cancel{background:rgba(255,255,255,0.04);color:rgba(255,255,255,0.3);}
+.upload-msg{font-size:11px;color:#f472b6;margin-top:8px;min-height:14px;}
+.shockwave{position:fixed;border-radius:50%;border:1.5px solid rgba(168,216,255,0.6);pointer-events:none;z-index:5;transform:translate(-50%,-50%) scale(0);animation:shock 0.9s ease-out forwards;}
+@keyframes shock{0%{transform:translate(-50%,-50%) scale(0);opacity:1;}100%{transform:translate(-50%,-50%) scale(8);opacity:0;}}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<video id="videoel" playsinline muted></video>
+
+<header>
+  <div class="logo">with.you</div>
+  <div class="header-btns">
+    <button class="cam-btn" id="camBtn" onclick="toggleCamera()">Camera</button>
+    <button class="gallery-btn" onclick="toggleGallery()">Memories</button>
+    <form method="POST" action="/logout" style="margin:0">
+      <button type="submit" class="logout-btn">Leave</button>
+    </form>
+  </div>
+</header>
+
+<div class="cam-status" id="camStatus"></div>
+<div class="gesture-indicator" id="gestureIndicator"></div>
+<button class="upload-fab" onclick="openModal()">+</button>
+
+<div class="gallery-overlay" id="galleryOverlay">
+  <div id="galleryContent"></div>
+</div>
+<button class="gallery-close" id="galleryClose" onclick="toggleGallery()">x</button>
+
+<div class="modal" id="modal">
+  <div class="modal-card">
+    <h2>Add a memory</h2>
+    <div class="drop-zone" onclick="document.getElementById('fileInput').click()">
+      <input type="file" id="fileInput" accept="image/*" onchange="previewFile(this)"/>
+      <div id="dropLabel">Click to choose a photo</div>
+    </div>
+    <div class="modal-btns">
+      <button class="btn-upload" onclick="doUpload()">Upload</button>
+      <button class="btn-cancel" onclick="closeModal()">Cancel</button>
+    </div>
+    <p class="upload-msg" id="uploadMsg"></p>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function(){
+  // ============================================================
+  // SPRITE TEXTURE - 星芒发光粒子
+  // ============================================================
+  function makeSpriteTex(){
+    var sz = 64;
+    var c = document.createElement('canvas');
+    c.width = c.height = sz;
+    var ctx = c.getContext('2d');
+    var cx = sz/2, cy = sz/2;
+    // 外发光
+    var g = ctx.createRadialGradient(cx,cy,0,cx,cy,sz/2);
+    g.addColorStop(0,'rgba(255,255,255,1)');
+    g.addColorStop(0.1,'rgba(210,235,255,0.95)');
+    g.addColorStop(0.3,'rgba(168,216,255,0.6)');
+    g.addColorStop(0.6,'rgba(140,180,255,0.2)');
+    g.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0,0,sz,sz);
+    // 十字星芒
+    ctx.strokeStyle = 'rgba(255,255,255,0.7)';
+    ctx.lineWidth = 0.8;
+    for(var i=0;i<4;i++){
+      var ang = i*Math.PI/2;
+      ctx.beginPath();
+      ctx.moveTo(cx,cy);
+      ctx.lineTo(cx+Math.cos(ang)*sz*0.48, cy+Math.sin(ang)*sz*0.48);
+      ctx.stroke();
+    }
+    // 斜星芒（细一点）
+    ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+    ctx.lineWidth = 0.5;
+    for(var i=0;i<4;i++){
+      var ang = i*Math.PI/2 + Math.PI/4;
+      ctx.beginPath();
+      ctx.moveTo(cx,cy);
+      ctx.lineTo(cx+Math.cos(ang)*sz*0.3, cy+Math.sin(ang)*sz*0.3);
+      ctx.stroke();
+    }
+    return new THREE.CanvasTexture(c);
+  }
+
+  // ============================================================
+  // THREE.JS SETUP
+  // ============================================================
+  var canvas = document.getElementById('c');
+  var DPR = Math.min(window.devicePixelRatio||1, 2);
+  var W = window.innerWidth, H = window.innerHeight;
+
+  var renderer = new THREE.WebGLRenderer({canvas:canvas, antialias:false, alpha:false});
+  renderer.setPixelRatio(DPR);
+  renderer.setSize(W,H);
+  renderer.setClearColor(0x000008,1);
+
+  var scene = new THREE.Scene();
+  var camera = new THREE.PerspectiveCamera(60, W/H, 0.1, 100);
+  camera.position.set(0,0,5.5);
+
+  var spriteTex = makeSpriteTex();
+
+  // ============================================================
+  // 自适应 Scale（手机/平板横竖屏）
+  // ============================================================
+  function getScale(){
+    var s = Math.min(W,H);
+    // iPad横屏时用较小边保证心不超出
+    return s * 0.000265;
+  }
+  var S = getScale();
+
+  // ============================================================
+  // 爱心目标（实心填充）
+  // ============================================================
+  var COUNT = 8444;
+  var heartTargets     = new Float32Array(COUNT*3);
+  var butterflyTargets = new Float32Array(COUNT*3);
+
+  function buildHeart(){
+    S = getScale();
+    var pts = [];
+    // 轮廓
+    var outline = Math.floor(COUNT*0.3);
+    for(var i=0;i<outline;i++){
+      var t=(i/outline)*Math.PI*2;
+      var x=16*Math.pow(Math.sin(t),3);
+      var y=13*Math.cos(t)-5*Math.cos(2*t)-2*Math.cos(3*t)-Math.cos(4*t);
+      pts.push([x*S, y*S, (Math.random()-0.5)*0.5]);
+    }
+    // 内部填充
+    var attempts=0;
+    while(pts.length<COUNT && attempts<COUNT*20){
+      attempts++;
+      var rx=(Math.random()-0.5)*34*S;
+      var ry=(Math.random()-0.5)*28*S;
+      var nx=rx/S, ny=ry/S;
+      var lhs=Math.pow(nx*nx+ny*ny-169,3);
+      var rhs=nx*nx*ny*ny*ny*0.0144;
+      if(lhs<=rhs) pts.push([rx,ry,(Math.random()-0.5)*1.4]);
+    }
+    for(var i=pts.length-1;i>0;i--){
+      var j=Math.floor(Math.random()*(i+1));
+      var tmp=pts[i];pts[i]=pts[j];pts[j]=tmp;
+    }
+    for(var i=0;i<COUNT;i++){
+      var p=pts[i%pts.length];
+      heartTargets[i*3]=p[0];
+      heartTargets[i*3+1]=p[1];
+      heartTargets[i*3+2]=p[2];
+    }
+  }
+  buildHeart();
+
+  // ============================================================
+  // 蝴蝶目标
+  // ============================================================
+  function buildButterfly(){
+    S = getScale();
+    var pts=[];
+    var sc=S*13;
+    // 上翅
+    var n1=Math.floor(COUNT*0.36);
+    for(var i=0;i<n1;i++){
+      var t=(i/n1)*Math.PI*2;
+      var r=Math.abs(Math.cos(2*t))*(0.55+Math.random()*0.45);
+      var side=i%2===0?1:-1;
+      var bx=side*Math.abs(Math.cos(t))*r*sc*1.1;
+      var by=Math.sin(t)*r*sc*0.7+sc*0.22;
+      pts.push([bx,by,(Math.random()-0.5)*0.7]);
+    }
+    // 下翅
+    var n2=Math.floor(COUNT*0.26);
+    for(var i=0;i<n2;i++){
+      var t=(i/n2)*Math.PI*2;
+      var r=Math.abs(Math.sin(t))*(0.3+Math.random()*0.28);
+      var side=i%2===0?1:-1;
+      var bx=side*Math.abs(Math.cos(t))*r*sc*1.0;
+      var by=Math.sin(t)*r*sc*0.45-sc*0.32;
+      pts.push([bx,by,(Math.random()-0.5)*0.5]);
+    }
+    // 身体
+    var n3=COUNT-pts.length;
+    for(var i=0;i<n3;i++){
+      var frac=i/n3;
+      if(frac<0.08){
+        var side=i%2===0?1:-1;
+        pts.push([side*frac*sc*0.6, sc*0.55+frac*sc*0.5, (Math.random()-0.5)*0.2]);
+      } else {
+        pts.push([(Math.random()-0.5)*sc*0.07, (frac-0.5)*sc*1.1, (Math.random()-0.5)*0.25]);
+      }
+    }
+    for(var i=pts.length-1;i>0;i--){
+      var j=Math.floor(Math.random()*(i+1));
+      var tmp=pts[i];pts[i]=pts[j];pts[j]=tmp;
+    }
+    for(var i=0;i<COUNT;i++){
+      var p=pts[i%pts.length];
+      butterflyTargets[i*3]=p[0];
+      butterflyTargets[i*3+1]=p[1];
+      butterflyTargets[i*3+2]=p[2];
+    }
+  }
+  buildButterfly();
+
+  // ============================================================
+  // 粒子数组
+  // ============================================================
+  var posArr   = new Float32Array(COUNT*3);
+  var velArr   = new Float32Array(COUNT*3);
+  var randArr  = new Float32Array(COUNT*3);
+  var colorArr = new Float32Array(COUNT*3);
+  var bflyOff  = new Float32Array(COUNT*3);
+  var bflyVel  = new Float32Array(COUNT*3);
+  var explodeV = new Float32Array(COUNT*3);
+
+  var palette=[
+    [1.0, 1.0, 1.0],
+    [0.78,0.92,1.0],
+    [0.6, 0.82,1.0],
+    [0.72,0.6, 0.98],
+    [0.98,0.8, 0.95],
+    [0.85,0.95,1.0]
+  ];
+
+  for(var i=0;i<COUNT;i++){
+    posArr[i*3]  =(Math.random()-0.5)*10;
+    posArr[i*3+1]=(Math.random()-0.5)*10;
+    posArr[i*3+2]=(Math.random()-0.5)*3;
+    randArr[i*3]  =Math.random()*100;
+    randArr[i*3+1]=Math.random()*Math.PI*2;
+    randArr[i*3+2]=Math.random()*0.5+0.5;
+    var c=palette[Math.floor(Math.random()*palette.length)];
+    colorArr[i*3]=c[0];colorArr[i*3+1]=c[1];colorArr[i*3+2]=c[2];
+    bflyOff[i*3]  =(Math.random()-0.5)*0.25;
+    bflyOff[i*3+1]=(Math.random()-0.5)*0.25;
+    bflyOff[i*3+2]=(Math.random()-0.5)*0.12;
+    bflyVel[i*3]  =(Math.random()-0.5)*0.005;
+    bflyVel[i*3+1]=(Math.random()-0.5)*0.005;
+    bflyVel[i*3+2]=(Math.random()-0.5)*0.003;
+  }
+
+  var geo=new THREE.BufferGeometry();
+  var posBuf=new THREE.BufferAttribute(posArr,3);
+  posBuf.setUsage(THREE.DynamicDrawUsage);
+  geo.setAttribute('position',posBuf);
+  geo.setAttribute('aColor', new THREE.BufferAttribute(colorArr,3));
+  geo.setAttribute('aRandom',new THREE.BufferAttribute(randArr,3));
+
+  var mat=new THREE.ShaderMaterial({
+    uniforms:{
+      uTime:{value:0},
+      uFade:{value:0},
+      uTex:{value:spriteTex},
+      uSize:{value:Math.min(W,H)*0.011}
+    },
+    vertexShader:[
+      'attribute vec3 aColor;',
+      'attribute vec3 aRandom;',
+      'uniform float uTime;',
+      'uniform float uFade;',
+      'uniform float uSize;',
+      'varying vec3 vColor;',
+      'varying float vAlpha;',
+      'void main(){',
+      '  vColor=aColor;',
+      '  float flicker=0.55+0.45*sin(uTime*2.5+aRandom.y*6.28);',
+      '  vAlpha=flicker*uFade*(0.6+aRandom.z*0.4);',
+      '  vec4 mvPos=modelViewMatrix*vec4(position,1.0);',
+      '  gl_Position=projectionMatrix*mvPos;',
+      '  float dist=max(length(mvPos.xyz),0.1);',
+      '  gl_PointSize=uSize*(5.5/dist)*(0.7+aRandom.z*0.6);',
+      '}'
+    ].join('\n'),
+    fragmentShader:[
+      'uniform sampler2D uTex;',
+      'varying vec3 vColor;',
+      'varying float vAlpha;',
+      'void main(){',
+      '  vec4 tex=texture2D(uTex,gl_PointCoord);',
+      '  if(tex.a<0.01) discard;',
+      '  gl_FragColor=vec4(vColor*tex.rgb*(1.0+tex.r*2.0),tex.a*vAlpha);',
+      '}'
+    ].join('\n'),
+    transparent:true,
+    blending:THREE.AdditiveBlending,
+    depthWrite:false
+  });
+
+  var pts=new THREE.Points(geo,mat);
+  scene.add(pts);
+
+  // ============================================================
+  // 状态机
+  // 0=heart 1=exploding 2=butterfly 3=returning
+  // ============================================================
+  var STATE=0;
+  var stateTimer=0;
+  var nextScatter=8+Math.random()*8;
+  var EXPLODE_DUR=1.8, BFLY_HOLD=5.0, RETURN_DUR=2.2;
+  var wingPhase=0;
+  var bflyGX=0,bflyGY=0,bflyGVX=(Math.random()-0.5)*0.004,bflyGVY=(Math.random()-0.5)*0.004;
+
+  // 外部手势控制状态
+  window._gestureState = {
+    forceHeart: false,
+    forceExplode: false
+  };
+
+  function prepExplode(){
+    for(var i=0;i<COUNT;i++){
+      var ang=Math.random()*Math.PI*2;
+      var elev=(Math.random()-0.5)*Math.PI;
+      var spd=1.8+Math.random()*4.0;
+      explodeV[i*3]  =Math.cos(ang)*Math.cos(elev)*spd;
+      explodeV[i*3+1]=Math.sin(elev)*spd;
+      explodeV[i*3+2]=Math.sin(ang)*Math.cos(elev)*spd*0.3;
+    }
+  }
+
+  // ============================================================
+  // 指针 / 摄像头引力
+  // ============================================================
+  var pointer={x:9999,y:9999,active:false};
+  window._camPointer={x:9999,y:9999,active:false};
+  var clickImpulse=null;
+
+  function toWorld(cx,cy){
+    var nx=(cx/W)*2-1, ny=-(cy/H)*2+1;
+    var fov=camera.fov*Math.PI/180;
+    var ww=Math.tan(fov/2)*camera.position.z;
+    var wh=ww/camera.aspect;
+    return {x:nx*ww, y:ny*wh};
+  }
+
+  window.addEventListener('mousemove',function(e){
+    var w=toWorld(e.clientX,e.clientY);
+    pointer.x=w.x;pointer.y=w.y;pointer.active=true;
+  });
+  window.addEventListener('touchmove',function(e){
+    if(e.target===canvas){
+      e.preventDefault();
+      var w=toWorld(e.touches[0].clientX,e.touches[0].clientY);
+      pointer.x=w.x;pointer.y=w.y;pointer.active=true;
+    }
+  },{passive:false});
+  window.addEventListener('mouseleave',function(){pointer.active=false;});
+  window.addEventListener('touchend',function(){pointer.active=false;});
+  window.addEventListener('click',function(e){
+    if(e.target!==canvas)return;
+    var w=toWorld(e.clientX,e.clientY);
+    clickImpulse={x:w.x,y:w.y,t:0};
+    spawnShockwave(e.clientX,e.clientY);
+  });
+  window.addEventListener('touchstart',function(e){
+    if(e.target===canvas){
+      var w=toWorld(e.touches[0].clientX,e.touches[0].clientY);
+      clickImpulse={x:w.x,y:w.y,t:0};
+      spawnShockwave(e.touches[0].clientX,e.touches[0].clientY);
+    }
+  });
+
+  function spawnShockwave(cx,cy){
+    var el=document.createElement('div');
+    el.className='shockwave';
+    el.style.left=cx+'px';el.style.top=cy+'px';
+    el.style.width='50px';el.style.height='50px';
+    document.body.appendChild(el);
+    setTimeout(function(){el.remove();},1000);
+  }
+
+  window.addEventListener('resize',function(){
+    W=window.innerWidth;H=window.innerHeight;
+    renderer.setSize(W,H);
+    camera.aspect=W/H;
+    camera.updateProjectionMatrix();
+    mat.uniforms.uSize.value=Math.min(W,H)*0.011;
+    buildHeart();
+    buildButterfly();
+  });
+
+  // ============================================================
+  // 动画循环
+  // ============================================================
+  var tt=0,fadeIn=0,DT=1/60;
+  function ease3(t){return t<0.5?4*t*t*t:(t-1)*(2*t-2)*(2*t-2)+1;}
+
+  function animate(){
+    requestAnimationFrame(animate);
+    tt+=DT;
+    fadeIn=Math.min(1,fadeIn+0.005);
+    mat.uniforms.uTime.value=tt;
+    mat.uniforms.uFade.value=fadeIn;
+    stateTimer+=DT;
+    wingPhase+=DT*3.8;
+
+    // 手势覆盖状态
+    var gs=window._gestureState;
+    if(gs.forceHeart && STATE!==0 && STATE!==3){
+      STATE=3;stateTimer=0;
+      gs.forceHeart=false;
+    }
+    if(gs.forceExplode && STATE===0){
+      STATE=1;stateTimer=0;
+      prepExplode();
+      gs.forceExplode=false;
+    }
+
+    // 自动状态切换
+    if(STATE===0 && stateTimer>=nextScatter){
+      STATE=1;stateTimer=0;prepExplode();
+    }
+    if(STATE===1 && stateTimer>=EXPLODE_DUR){STATE=2;stateTimer=0;}
+    if(STATE===2 && stateTimer>=BFLY_HOLD){STATE=3;stateTimer=0;}
+    if(STATE===3 && stateTimer>=RETURN_DUR){
+      STATE=0;stateTimer=0;
+      nextScatter=8+Math.random()*8;
+    }
+
+    // 蝴蝶漫游
+    if(STATE===1||STATE===2||STATE===3){
+      bflyGX+=bflyGVX;bflyGY+=bflyGVY;
+      if(Math.abs(bflyGX)>1.2)bflyGVX*=-1;
+      if(Math.abs(bflyGY)>0.8)bflyGVY*=-1;
+    } else {
+      bflyGX*=0.96;bflyGY*=0.96;
+    }
+
+    var breath=1+Math.sin(tt*0.7)*0.03;
+    var wingFlap=1+Math.sin(wingPhase)*0.14;
+
+    // 选取活跃指针（摄像头优先）
+    var ap=window._camPointer.active?window._camPointer:pointer;
+
+    for(var i=0;i<COUNT;i++){
+      var ix=i*3,iy=i*3+1,iz=i*3+2;
+      var px=posArr[ix],py=posArr[iy],pz=posArr[iz];
+      var ax=0,ay=0,az=0;
+
+      if(STATE===0){
+        var tx=heartTargets[ix]*breath,ty=heartTargets[iy]*breath,tz=heartTargets[iz];
+        ax=(tx-px)*0.065;ay=(ty-py)*0.065;az=(tz-pz)*0.045;
+        var ns=sn(px*0.45+randArr[ix]*0.01+tt*0.14,py*0.45+tt*0.11)*0.007;
+        var nc=sn(px*0.45+randArr[ix]*0.01+tt*0.11+40,py*0.45+tt*0.14+40)*0.007;
+        ax+=ns;ay+=nc;
+      }
+      else if(STATE===1){
+        var prog=ease3(Math.min(1,stateTimer/EXPLODE_DUR));
+        ax+=explodeV[ix]*0.09*(1-prog*0.6);
+        ay+=explodeV[iy]*0.09*(1-prog*0.6);
+        az+=explodeV[iz]*0.09;
+        var btx=butterflyTargets[ix]*wingFlap+bflyGX;
+        var bty=butterflyTargets[iy]+bflyGY;
+        var btz=butterflyTargets[iz];
+        ax+=(btx-px)*0.018*prog;
+        ay+=(bty-py)*0.018*prog;
+        az+=(btz-pz)*0.018*prog;
+      }
+      else if(STATE===2){
+        bflyOff[ix]+=bflyVel[ix];bflyOff[iy]+=bflyVel[iy];bflyOff[iz]+=bflyVel[iz];
+        if(Math.abs(bflyOff[ix])>0.3)bflyVel[ix]*=-1;
+        if(Math.abs(bflyOff[iy])>0.3)bflyVel[iy]*=-1;
+        if(Math.abs(bflyOff[iz])>0.18)bflyVel[iz]*=-1;
+        var btx=butterflyTargets[ix]*wingFlap+bflyGX+bflyOff[ix];
+        var bty=butterflyTargets[iy]+bflyGY+bflyOff[iy];
+        var btz=butterflyTargets[iz]+bflyOff[iz];
+        ax=(btx-px)*0.06;ay=(bty-py)*0.06;az=(btz-pz)*0.045;
+      }
+      else if(STATE===3){
+        var prog=ease3(Math.min(1,stateTimer/RETURN_DUR));
+        var tx=heartTargets[ix]*breath,ty=heartTargets[iy]*breath,tz=heartTargets[iz];
+        ax=(tx-px)*0.045*(0.4+prog*0.6);
+        ay=(ty-py)*0.045*(0.4+prog*0.6);
+        az=(tz-pz)*0.035;
+      }
+
+      // 指针引力
+      if(ap.active){
+        var dx=px-ap.x,dy=py-ap.y;
+        var d2=dx*dx+dy*dy;
+        if(d2<2.0){
+          var d=Math.sqrt(d2)+0.001;
+          var f=0.24*(1-d/1.42)/d;
+          ax+=dx*f;ay+=dy*f;
+        }
+      }
+
+      // 冲击波
+      if(clickImpulse){
+        var cdx=px-clickImpulse.x,cdy=py-clickImpulse.y;
+        var cd=Math.sqrt(cdx*cdx+cdy*cdy)+0.001;
+        var ring=Math.abs(cd-clickImpulse.t*3.8);
+        if(ring<0.65){
+          var cf=0.65*(1-ring/0.65)/cd;
+          ax+=cdx*cf;ay+=cdy*cf;
+        }
+      }
+
+      velArr[ix]=(velArr[ix]+ax)*0.87;
+      velArr[iy]=(velArr[iy]+ay)*0.87;
+      velArr[iz]=(velArr[iz]+az)*0.87;
+      posArr[ix]+=velArr[ix];
+      posArr[iy]+=velArr[iy];
+      posArr[iz]+=velArr[iz];
+    }
+
+    if(clickImpulse){clickImpulse.t+=DT;if(clickImpulse.t>1.5)clickImpulse=null;}
+    posBuf.needsUpdate=true;
+    renderer.render(scene,camera);
+  }
+
+  function sn(x,y){var n=Math.sin(x*127.1+y*311.7)*43758.5453;return (n-Math.floor(n))*2-1;}
+
+  animate();
+})();
+
+// ============================================================
+// MEDIAPIPE 摄像头 + 手势
+// ============================================================
+var cameraActive=false;
+var gestureRecognizer=null;
+var videoStream=null;
+var camRaf=null;
+var lastGesture='';
+
+function showStatus(msg,dur){
+  var el=document.getElementById('camStatus');
+  el.textContent=msg;el.classList.add('show');
+  if(dur) setTimeout(function(){el.classList.remove('show');},dur);
+}
+function showGesture(msg){
+  var el=document.getElementById('gestureIndicator');
+  el.textContent=msg;el.classList.add('show');
+  clearTimeout(el._t);
+  el._t=setTimeout(function(){el.classList.remove('show');},2000);
+}
+
+function toggleCamera(){
+  if(!cameraActive) startCamera();
+  else stopCamera();
+}
+
+function startCamera(){
+  showStatus('Loading hand model...');
+  var s=document.createElement('script');
+  s.src='https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/vision_bundle.js';
+  s.crossOrigin='anonymous';
+  s.onload=function(){
+    if(!window.FilesetResolver){showStatus('Model unavailable',3000);return;}
+    window.FilesetResolver.forVisionTasks(
+      'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm'
+    ).then(function(fs){
+      return window.GestureRecognizer.createFromOptions(fs,{
+        baseOptions:{
+          modelAssetPath:'https://storage.googleapis.com/mediapipe-models/gesture_recognizer/gesture_recognizer/float16/1/gesture_recognizer.task',
+          delegate:'GPU'
+        },
+        runningMode:'VIDEO',
+        numHands:1
+      });
+    }).then(function(gr){
+      gestureRecognizer=gr;
+      return navigator.mediaDevices.getUserMedia({video:{facingMode:'user',width:320,height:240},audio:false});
+    }).then(function(stream){
+      videoStream=stream;
+      var vid=document.getElementById('videoel');
+      vid.srcObject=stream;vid.play();
+      cameraActive=true;
+      document.getElementById('camBtn').classList.add('active');
+      showStatus('Hand tracking ON',2000);
+      runDetection();
+    }).catch(function(){
+      showStatus('Camera denied',3000);
+    });
+  };
+  s.onerror=function(){showStatus('Failed to load',3000);};
+  document.head.appendChild(s);
+}
+
+function runDetection(){
+  var vid=document.getElementById('videoel');
+  var last=-1;
+  function detect(){
+    if(!cameraActive)return;
+    camRaf=requestAnimationFrame(detect);
+    if(vid.readyState<2)return;
+    var now=performance.now();
+    if(now===last)return;
+    last=now;
+    if(!gestureRecognizer)return;
+    var res=gestureRecognizer.recognizeForVideo(vid,now);
+
+    if(res&&res.landmarks&&res.landmarks.length>0){
+      // 手掌中心（landmark 9）控制引力
+      var lm=res.landmarks[0];
+      var palm=lm[9];
+      var cx=(1-palm.x)*window.innerWidth;
+      var cy=palm.y*window.innerHeight;
+      var fov=60*Math.PI/180;
+      var ww=Math.tan(fov/2)*5.5;
+      var wh=ww/(window.innerWidth/window.innerHeight);
+      window._camPointer.x=((cx/window.innerWidth)*2-1)*ww;
+      window._camPointer.y=-(((cy/window.innerHeight)*2-1))*wh;
+      window._camPointer.active=true;
+
+      // 手势识别
+      if(res.gestures&&res.gestures.length>0){
+        var g=res.gestures[0][0].categoryName;
+        if(g!==lastGesture){
+          lastGesture=g;
+          if(g==='Closed_Fist'){
+            window._gestureState.forceHeart=true;
+            showGesture('Fist - Return to heart');
+          } else if(g==='Open_Palm'){
+            window._gestureState.forceExplode=true;
+            showGesture('Open palm - Explode!');
+          }
+        }
+      }
+    } else {
+      window._camPointer.active=false;
+      lastGesture='';
+    }
+  }
+  detect();
+}
+
+function stopCamera(){
+  cameraActive=false;
+  if(camRaf)cancelAnimationFrame(camRaf);
+  if(videoStream)videoStream.getTracks().forEach(function(t){t.stop();});
+  videoStream=null;
+  window._camPointer.active=false;
+  document.getElementById('camBtn').classList.remove('active');
+  showStatus('Hand tracking OFF',1500);
+}
+
+// ============================================================
+// GALLERY
+// ============================================================
+var messages=['I like being with you','Stay a bit longer','You make everything better','I miss you already','Always you'];
+var msgIdx={};
+function handleClick(el){
+  var id=el.dataset.id;
+  if(!msgIdx[id])msgIdx[id]=0;
+  el.querySelector('.overlay-text').textContent=messages[msgIdx[id]%messages.length];
+  el.classList.add('show-text');msgIdx[id]++;
+  setTimeout(function(){el.classList.remove('show-text');},3000);
+}
+function buildGallery(){
+  fetch('/api/photos').then(function(r){return r.json();}).then(function(files){
+    var el=document.getElementById('galleryContent');
+    if(!files.length){el.innerHTML='<div class="empty">No memories yet</div>';return;}
+    var html='<div class="gallery">';
+    for(var i=0;i<files.length;i++){
+      html+='<div class="img-wrap" data-id="'+i+'" onclick="handleClick(this)">';
+      html+='<img src="/uploads/'+files[i]+'" loading="lazy"/>';
+      html+='<div class="overlay-text"></div></div>';
+    }
+    html+='</div>';
+    el.innerHTML=html;
+  });
+}
+function toggleGallery(){
+  var ov=document.getElementById('galleryOverlay');
+  var cl=document.getElementById('galleryClose');
+  var open=ov.classList.toggle('open');
+  if(open){cl.classList.add('show');buildGallery();}
+  else cl.classList.remove('show');
+}
+
+// ============================================================
+// UPLOAD
+// ============================================================
+function openModal(){document.getElementById('modal').classList.add('open');}
+function closeModal(){
+  document.getElementById('modal').classList.remove('open');
+  document.getElementById('fileInput').value='';
+  document.getElementById('dropLabel').textContent='Click to choose a photo';
+  document.getElementById('uploadMsg').textContent='';
+}
+function previewFile(i){if(i.files[0])document.getElementById('dropLabel').textContent=i.files[0].name;}
+function doUpload(){
+  var f=document.getElementById('fileInput').files[0];
+  var msg=document.getElementById('uploadMsg');
+  if(!f){msg.textContent='Please choose a photo.';return;}
+  msg.textContent='Uploading...';
+  var fd=new FormData();fd.append('photo',f);
+  fetch('/upload',{method:'POST',body:fd}).then(function(r){return r.json();}).then(function(d){
+    if(d.success){closeModal();buildGallery();}
+    else msg.textContent=d.message||'Failed.';
+  });
+}
+document.getElementById('modal').addEventListener('click',function(e){if(e.target===this)closeModal();});
+</script>
+</body>
+</html>
