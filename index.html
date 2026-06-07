@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
+    />
+    <title>Custom Engine — Kernel</title>
+    <style>
+      :root {
+        color-scheme: dark;
+      }
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: #07070c;
+        overflow: hidden;
+      }
+      #app {
+        display: block;
+        width: 100vw;
+        height: 100vh;
+        height: 100dvh; /* dynamic viewport: avoids iOS Safari URL-bar resize jumps */
+        touch-action: none; /* the input module will own all gestures (gyro/touch) */
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="app"></canvas>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
