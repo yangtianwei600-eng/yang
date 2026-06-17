@@ -1,0 +1,190 @@
+/* ============================================
+   字体（本地打包，不依赖 Google Fonts，国内可用）
+   ============================================ */
+@import "@fontsource/inter/400.css";
+@import "@fontsource/inter/500.css";
+@import "@fontsource/inter/600.css";
+@import "@fontsource/jetbrains-mono/400.css";
+@import "@fontsource/jetbrains-mono/500.css";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================
+   设计系统 Tokens（唯一真相来源）
+   实色用 RGB 通道三元组，配合 rgb(var() / <alpha>) 支持透明度修饰符。
+   玻璃相关保留 rgba 字面量。
+   ============================================ */
+:root {
+  /* 基础层（RGB 通道） */
+  --bg-base: 8 9 12;
+  --bg-surface: 15 16 21;
+  --bg-editor: 13 14 18; /* 编辑器专用，永不加 blur */
+
+  /* 文字（RGB 通道） */
+  --text-primary: 242 243 245;
+  --text-secondary: 144 148 166;
+  --text-tertiary: 91 94 110;
+
+  /* 品牌强调色（RGB 通道） */
+  --accent-primary: 108 111 240;
+  --accent-primary-hover: 125 128 255;
+
+  /* 语义色（RGB 通道，全局唯一含义） */
+  --status-pass: 61 220 151;
+  --status-fail: 240 98 92;
+  --status-warn: 240 178 85;
+  --status-info: 89 183 242;
+
+  /* 玻璃（rgba 字面量，直接用） */
+  --glass-fill: rgba(255, 255, 255, 0.04);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-border-top: rgba(255, 255, 255, 0.16);
+}
+
+/* ============================================
+   基础重置
+   ============================================ */
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background-color: rgb(var(--bg-base));
+  color: rgb(var(--text-primary));
+  font-family: "Inter", -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+  font-size: 14px;
+  line-height: 22px;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  /* 安全区适配（iPhone 刘海/底部条） */
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom)
+    env(safe-area-inset-left);
+}
+
+/* 等宽数字：计时器/XP/连续天数更新时不跳动 */
+.tnum {
+  font-feature-settings: "tnum";
+}
+
+/* ============================================
+   玻璃面板（仅用于导航/助手/控制台，编辑器禁用）
+   ============================================ */
+.glass {
+  background-color: var(--glass-fill);
+  backdrop-filter: blur(24px) saturate(140%);
+  -webkit-backdrop-filter: blur(24px) saturate(140%);
+  border: 1px solid var(--glass-border);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.06) inset,
+    0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+/* ============================================
+   签名元素：执行光带
+   运行时编辑器边缘渐变光带旋转一圈，定格成结果色。
+   纯 CSS 合成层动画，自动贴合屏幕刷新率（含 120Hz）。
+   ============================================ */
+@property --glow-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+
+.editor-frame {
+  position: relative;
+  isolation: isolate;
+}
+
+.editor-frame::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  padding: 1px; /* 光带厚度 */
+  border-radius: inherit;
+  /* 只在边框处显示：双层 mask 做镂空 */
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.35s ease;
+  z-index: 2;
+}
+
+/* 运行中：品牌色渐变沿边框旋转 */
+.editor-frame[data-runstate="running"]::before {
+  opacity: 1;
+  background: conic-gradient(
+    from var(--glow-angle),
+    transparent 0%,
+    rgb(var(--accent-primary)) 20%,
+    rgb(var(--status-info)) 35%,
+    transparent 55%
+  );
+  animation: glow-spin 1.2s linear infinite;
+}
+
+/* 成功：定格绿色 */
+.editor-frame[data-runstate="success"]::before {
+  opacity: 1;
+  background: rgb(var(--status-pass));
+  box-shadow: 0 0 24px -4px rgb(var(--status-pass) / 0.6);
+}
+
+/* 失败：定格红色 */
+.editor-frame[data-runstate="error"]::before {
+  opacity: 1;
+  background: rgb(var(--status-fail));
+  box-shadow: 0 0 24px -4px rgb(var(--status-fail) / 0.6);
+}
+
+@keyframes glow-spin {
+  to {
+    --glow-angle: 360deg;
+  }
+}
+
+/* ============================================
+   滚动条（深色细滚动条，符合 Linear 风格）
+   ============================================ */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.16);
+  background-clip: content-box;
+}
+
+/* ============================================
+   无障碍：尊重减少动效偏好
+   ============================================ */
+@media (prefers-reduced-motion: reduce) {
+  .editor-frame[data-runstate="running"]::before {
+    animation: none;
+    background: rgb(var(--accent-primary));
+  }
+  * {
+    transition-duration: 0.01ms !important;
+  }
+}
