@@ -12,6 +12,7 @@ export default {
         bg: {
           base: "rgb(var(--bg-base) / <alpha-value>)",
           surface: "rgb(var(--bg-surface) / <alpha-value>)",
+          sidebar: "rgb(var(--bg-sidebar) / <alpha-value>)",
           editor: "rgb(var(--bg-editor) / <alpha-value>)",
         },
         text: {
@@ -42,9 +43,10 @@ export default {
         mono: ["JetBrains Mono", "Menlo", "Consolas", "monospace"],
       },
       borderRadius: {
-        control: "8px",
-        card: "10px",
-        panel: "16px",
+        control: "10px",
+        card: "14px",
+        panel: "20px",
+        pill: "9999px",
       },
       fontSize: {
         // 设计系统字号阶梯

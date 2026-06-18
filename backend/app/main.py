@@ -10,7 +10,7 @@ from .config import settings
 from .database import Base, engine, SessionLocal
 from . import models  # noqa: F401  确保模型被注册
 from .seed import seed_content
-from .routers import auth, content, progress, review
+from .routers import auth, content, progress, review, run, scripts
 
 
 @asynccontextmanager
@@ -40,6 +40,8 @@ app.include_router(auth.router)
 app.include_router(content.router)
 app.include_router(progress.router)
 app.include_router(review.router)
+app.include_router(run.router)
+app.include_router(scripts.router)
 
 
 @app.get("/api/health")

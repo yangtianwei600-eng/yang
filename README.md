@@ -1,61 +1,57 @@
-# Python 学习平台
+# 学练
 
-手机优先的 Python 学习 + 练习 + 接单技能训练平台。服务器端真实执行 Python（含爬虫联网），间隔重复复习，闯关式练习。
+自己用的 Python 练习平台。核心就一件事:在手机上随手写 Python,点一下在服务器上真跑出来,顺便练爬虫。
+
+平时想练手的时候手机上一直没个顺手的环境——在线 IDE 要么广告一堆,要么装不了库,干脆自己搭一个。代码在服务器的 Docker 沙箱里跑,requests、beautifulsoup、pandas、playwright 这些都预装好了,写完直接看结果。
+
+## 它能干嘛
+
+- **代码工作台**:写任意 Python,点运行,沙箱里执行,结果弹窗返回。脚本能存、能改、能删。
+- **学习 + 练习**:内置 Python 基础和爬虫两套课程,看完标记完成、记进度。
+- **复习**:SM-2 间隔重复,到点该复习的自动排出来。
+- **登录**:谷歌 OAuth + 邮箱白名单,自用,不开放注册。
+
+界面是照着平时用得最顺手的那几个 App 慢慢抠的——暖色调、磨砂、左滑侧边栏,手机优先,iPad 和桌面也都适配。
 
 ## 技术栈
 
-- 前端：React + Vite + TypeScript + Tailwind + Monaco（后续阶段接入）
-- 后端：FastAPI + PostgreSQL + Redis（后续阶段）
-- 执行：Docker 容器隔离（后续阶段）
+- 前端:React + Vite + TypeScript + Tailwind
+- 后端:FastAPI + SQLite(SQLAlchemy 写的,以后要多用户再换 PostgreSQL)
+- 执行:Docker 沙箱,单独一个镜像预装常用库;容器只读文件系统、非 root、砍掉多余权限、限内存和进程数,但保留联网(爬虫得用)
+- 部署:VPS + Nginx 反代 + Cloudflare,全程 HTTPS
 
-## 当前进度
+后端顺手把前端打包后的静态文件一起托管了,同源,省得管 CORS。
 
-**第一阶段 ✅ 项目骨架 + 全局设计系统 + 四象限布局外壳**
+## 跑起来
 
-- Vite + React + TS + Tailwind 工程配置
-- 设计系统 tokens 全部落地（颜色 / 字体 / 间距 / 圆角）
-- Linear/Stripe 深色玻璃风格
-- 签名元素「执行光带」（运行时编辑器边缘渐变光带）
-- 三档响应式：桌面四象限 / iPad竖屏 / 手机底部tab+抽屉
-- 假运行器演示状态机（idle/running/success/error）
+后端:
 
-> 编辑器目前是静态占位视图，下一阶段接入 Monaco；运行按钮目前是假数据，后续阶段接 WebSocket 到 VPS 真实执行。
-
-## 目录结构
-
-```
-python-learn-platform/
-├── frontend/              前端工程
-│   ├── src/
-│   │   ├── components/layout/   四象限布局组件
-│   │   ├── hooks/              响应式断点
-│   │   ├── lib/               工具函数
-│   │   ├── types/             类型定义（含状态机）
-│   │   ├── App.tsx            根组件（当前含假运行器）
-│   │   ├── main.tsx
-│   │   └── index.css          设计系统 CSS + 签名光带动画
-│   ├── package.json
-│   ├── tailwind.config.js     设计 tokens → 工具类映射
-│   └── vite.config.ts
-└── README.md
+```bash
+cd backend
+python3 -m venv venv && source venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env        # 填自己的谷歌 OAuth、白名单邮箱
+uvicorn app.main:app --reload
 ```
 
-## 本地运行
+前端:
 
 ```bash
 cd frontend
 npm install
-npm run dev
-# 浏览器打开 http://localhost:5173
+npm run dev                 # 开发；上线用 npm run build,交给后端托管
 ```
 
-## 在 VPS 上运行（预览）
+几个坑提前说:
 
-```bash
-git clone <你的仓库地址>
-cd python-learn-platform/frontend
-npm install
-npm run build      # 构建
-npm run preview    # 预览，监听 0.0.0.0:4173
-# 浏览器访问 http://<VPS-IP>:4173
+- 工作台要能跑代码,得先装 Docker、把 sandbox/ 里的镜像构建出来。没 Docker 工作台用不了,别的功能不受影响。
+- 谷歌登录要去 Google Cloud 建 OAuth 凭据,回调填自己的域名。谷歌强制 HTTPS,所以登录这块得部署到带 HTTPS 的域名上才能真正打通,本地 http 跑不通。
+- 密钥都在 backend/.env,模板是 .env.example,不进仓库。
+
+## 目录
+
+```
+backend/    FastAPI、数据模型、沙箱执行
+frontend/   React 前端
+sandbox/    代码执行用的 Docker 镜像
 ```

@@ -30,3 +30,8 @@ __pycache__/
 venv/
 .venv/
 backend/app.db
+
+# 数据库不入库
+*.db
+*.sqlite
+*.sqlite3

@@ -112,3 +112,17 @@ class ReviewItem(Base):
     repetitions: Mapped[int] = mapped_column(Integer, default=0)
     due_date: Mapped[date] = mapped_column(Date, index=True, default=date.today)
     last_reviewed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+# ── 用户保存的脚本（满血工作台）──
+class Script(Base):
+    __tablename__ = "scripts"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    title: Mapped[str] = mapped_column(String(255), default="未命名脚本")
+    code: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
