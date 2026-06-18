@@ -1,0 +1,15 @@
+[Unit]
+Description=Xuelian backend (FastAPI / uvicorn)
+After=network.target docker.service
+Wants=docker.service
+
+[Service]
+Type=simple
+# 关键：工作目录固定在 backend/，否则读不到 .env、SQLite 路径也会错
+WorkingDirectory=/root/python-learn-platform/backend
+ExecStart=/root/python-learn-platform/backend/venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

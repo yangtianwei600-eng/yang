@@ -11,6 +11,8 @@ import {
   Trash2,
   Menu,
   Check,
+  Copy,
+  Eraser,
   X,
 } from "lucide-react";
 
@@ -37,6 +39,7 @@ export function CodeLab({ onMenu }: { onMenu?: () => void }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [scripts, setScripts] = useState<ScriptSummary[]>([]);
   const [editingTitle, setEditingTitle] = useState(false);
+  const [copied, setCopied] = useState(false); // 复制代码反馈
 
   const taRef = useRef<HTMLTextAreaElement>(null);
 
@@ -97,6 +100,26 @@ export function CodeLab({ onMenu }: { onMenu?: () => void }) {
     setRunState("idle");
     setDirty(false);
     setDrawerOpen(false);
+  };
+
+  // ── 复制代码 ──
+  const handleCopyCode = async () => {
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1200);
+    } catch {
+      // 忽略
+    }
+  };
+
+  // ── 清空当前代码 ──
+  const handleClear = () => {
+    setCode("");
+    setDirty(true);
+    setResult(null);
+    setRunState("idle");
+    taRef.current?.focus();
   };
 
   // ── 打开脚本 ──
@@ -194,6 +217,24 @@ export function CodeLab({ onMenu }: { onMenu?: () => void }) {
           )}
         </div>
 
+        {/* 复制代码 */}
+        <button
+          onClick={handleCopyCode}
+          className="flex h-9 w-9 items-center justify-center rounded-control text-text-secondary transition-colors hover:bg-white/[0.06] hover:text-text-primary"
+          aria-label="复制代码"
+        >
+          {copied ? <Check size={18} className="text-status-pass" /> : <Copy size={18} />}
+        </button>
+
+        {/* 清空代码 */}
+        <button
+          onClick={handleClear}
+          className="flex h-9 w-9 items-center justify-center rounded-control text-text-secondary transition-colors hover:bg-white/[0.06] hover:text-text-primary"
+          aria-label="清空代码"
+        >
+          <Eraser size={18} />
+        </button>
+
         {/* 脚本列表 */}
         <button
           onClick={() => setDrawerOpen(true)}
@@ -207,10 +248,10 @@ export function CodeLab({ onMenu }: { onMenu?: () => void }) {
         <button
           onClick={handleSave}
           disabled={saving || !dirty}
-          className="flex h-9 items-center gap-1.5 rounded-control px-3 text-label text-text-secondary transition-colors hover:bg-white/[0.06] hover:text-text-primary disabled:opacity-40"
+          className="flex h-9 w-9 items-center justify-center rounded-control text-text-secondary transition-colors hover:bg-white/[0.06] hover:text-text-primary disabled:opacity-40"
+          aria-label="保存"
         >
-          {saving ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />}
-          <span>保存</span>
+          {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={18} />}
         </button>
       </header>
 
@@ -283,7 +324,7 @@ export function CodeLab({ onMenu }: { onMenu?: () => void }) {
   );
 }
 
-// ── 输出面板 ──
+// ── 输出面板（居中浮窗）──
 function OutputPanel({
   result,
   onClose,
@@ -292,18 +333,30 @@ function OutputPanel({
   onClose: () => void;
 }) {
   const ok = result.exit_code === 0 && !result.timed_out;
+  const [outCopied, setOutCopied] = useState(false);
+
+  const copyOutput = async () => {
+    try {
+      await navigator.clipboard.writeText((result.stdout || "") + (result.stderr || ""));
+      setOutCopied(true);
+      setTimeout(() => setOutCopied(false), 1200);
+    } catch {
+      // 忽略
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-5">
       {/* 遮罩：点击关闭 */}
       <div className="absolute inset-0 bg-black/60" onClick={onClose} />
-      {/* 结果窗口：居中浮窗，不铺满整屏 */}
-      <div className="glass relative flex max-h-[70%] w-full max-w-[560px] flex-col overflow-hidden rounded-panel">
+      {/* 结果窗口：居中浮窗，固定高度；输出超出在窗内上下滚 */}
+      <div className="glass relative flex h-[68%] w-full max-w-[600px] flex-col overflow-hidden rounded-panel">
         <div className="flex items-center justify-between border-b border-glass px-4 py-3">
-          <div className="flex items-center gap-2">
+          <div className="flex min-w-0 items-center gap-2">
             {ok ? (
-              <Check size={15} className="text-status-pass" />
+              <Check size={15} className="shrink-0 text-status-pass" />
             ) : (
-              <X size={15} className="text-status-fail" />
+              <X size={15} className="shrink-0 text-status-fail" />
             )}
             <span className="text-label text-text-secondary">
               {result.timed_out ? "超时终止" : ok ? "运行完成" : `退出码 ${result.exit_code}`}
@@ -314,14 +367,28 @@ function OutputPanel({
               </span>
             )}
           </div>
-          <button
-            onClick={onClose}
-            className="flex h-7 w-7 items-center justify-center rounded-control text-text-tertiary transition-colors hover:bg-white/[0.06] hover:text-text-primary"
-          >
-            <X size={17} />
-          </button>
+          <div className="flex shrink-0 items-center gap-1">
+            <button
+              onClick={copyOutput}
+              className="flex h-7 w-7 items-center justify-center rounded-control text-text-tertiary transition-colors hover:bg-white/[0.06] hover:text-text-primary"
+              aria-label="复制输出"
+            >
+              {outCopied ? (
+                <Check size={16} className="text-status-pass" />
+              ) : (
+                <Copy size={16} />
+              )}
+            </button>
+            <button
+              onClick={onClose}
+              className="flex h-7 w-7 items-center justify-center rounded-control text-text-tertiary transition-colors hover:bg-white/[0.06] hover:text-text-primary"
+              aria-label="关闭"
+            >
+              <X size={17} />
+            </button>
+          </div>
         </div>
-        <pre className="min-h-0 flex-1 overflow-auto overscroll-contain px-4 py-3 font-mono text-code leading-5">
+        <pre className="min-h-0 flex-1 overflow-auto overscroll-contain whitespace-pre-wrap break-all px-4 py-3 font-mono text-code leading-5">
           {result.stdout && <span className="text-text-primary">{result.stdout}</span>}
           {result.stderr && <span className="text-status-fail">{result.stderr}</span>}
           {!result.stdout && !result.stderr && (
