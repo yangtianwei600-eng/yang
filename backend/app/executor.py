@@ -12,9 +12,9 @@ from dataclasses import dataclass
 
 IMAGE = "pysandbox:latest"
 TIMEOUT_SECONDS = 14 * 60  # 14 分钟
-MEM_LIMIT = "1024m"        # 放宽到 1G（Playwright/pandas 需要）
-CPU_LIMIT = "0.9"
-PIDS_LIMIT = "256"
+MEM_LIMIT = "2048m"
+CPU_LIMIT = "3.0"
+PIDS_LIMIT = "512"
 OUTPUT_LIMIT = 256 * 1024  # 输出最多 256KB
 
 
@@ -48,8 +48,8 @@ async def run_python(code: str) -> RunResult:
             "--cpus", CPU_LIMIT,
             "--pids-limit", PIDS_LIMIT,
             "--read-only",                   # 根文件系统只读
-            "--tmpfs", "/tmp:rw,size=128m",   # 可写 /tmp（含临时文件）
-            "--shm-size", "256m",            # 共享内存（Chromium 必需）
+            "--tmpfs", "/tmp:rw,size=256m",   # 可写 /tmp（含临时文件）
+            "--shm-size", "512m",            # 共享内存（Chromium 必需）
             "--user", "nobody",              # 非 root
             "--cap-drop", "ALL",             # 去掉所有 Linux capability
             "--security-opt", "no-new-privileges",
