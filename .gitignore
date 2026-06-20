@@ -35,3 +35,6 @@ backend/app.db
 *.db
 *.sqlite
 *.sqlite3
+backend/.env
+*.bak
+yang-secrets.tar.gz

@@ -1,0 +1,4 @@
+docker: Docker version 20.10.24+dfsg1, build 297e128
+node: v20.20.2
+python3: Python 3.11.2
+git remote: https://github.com/yangtianwei600-eng/yang.git

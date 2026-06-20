@@ -1,3 +1,4 @@
+# /etc/systemd/system/learn.service
 [Unit]
 Description=Xuelian backend (FastAPI / uvicorn)
 After=network.target docker.service
