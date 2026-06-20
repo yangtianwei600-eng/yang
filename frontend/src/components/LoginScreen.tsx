@@ -19,7 +19,7 @@ export function LoginScreen() {
             <span className="font-mono text-lg font-semibold">Py</span>
           </div>
           <div>
-            <div className="text-section">学练</div>
+            <div className="text-section">小杨PRO</div>
             <div className="text-label text-text-tertiary">Python 学习平台</div>
           </div>
         </div>

@@ -28,7 +28,7 @@ export function Sidebar({ active, onSelect, compact = false }: SidebarProps) {
         <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-control bg-accent/15 text-accent">
           <span className="font-mono text-base font-semibold">Py</span>
         </div>
-        {!compact && <span className="text-section">学练</span>}
+        {!compact && <span className="text-section">小杨PRO</span>}
       </div>
 
       {/* 导航项 */}

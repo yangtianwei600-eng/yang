@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import type { KeyboardEvent, MouseEvent } from "react";
 import { api, ApiError } from "@/lib/api";
 import type { RunResult, ScriptSummary } from "@/types/api";
+import { InteractiveConsole } from "@/components/InteractiveConsole";
 import {
   Play,
   Loader2,
@@ -16,15 +17,11 @@ import {
   X,
 } from "lucide-react";
 
-const DEFAULT_CODE = `# 满血 Python · 想写什么写什么
-# 已预装：requests httpx beautifulsoup4 lxml pandas numpy openpyxl sqlalchemy redis openai playwright
-
-print("Hello, 满血 Python")
-`;
+const DEFAULT_CODE = "";
 
 type RunState = "idle" | "running" | "done" | "error";
 
-export function CodeLab({ onMenu }: { onMenu?: () => void }) {
+export function CodeLab({ user }: { user?: { picture?: string; name?: string } }) {
   const [code, setCode] = useState(DEFAULT_CODE);
   const [runState, setRunState] = useState<RunState>("idle");
   const [result, setResult] = useState<RunResult | null>(null);
@@ -40,6 +37,7 @@ export function CodeLab({ onMenu }: { onMenu?: () => void }) {
   const [scripts, setScripts] = useState<ScriptSummary[]>([]);
   const [editingTitle, setEditingTitle] = useState(false);
   const [copied, setCopied] = useState(false); // 复制代码反馈
+  const [interactiveOpen, setInteractiveOpen] = useState(false);
 
   const taRef = useRef<HTMLTextAreaElement>(null);
 
@@ -185,11 +183,15 @@ export function CodeLab({ onMenu }: { onMenu?: () => void }) {
       {/* 顶栏 */}
       <header className="flex items-center gap-2 px-3 py-2.5">
         <button
-          onClick={onMenu}
-          className="flex h-9 w-9 items-center justify-center rounded-control text-text-secondary transition-colors hover:bg-white/[0.06] hover:text-text-primary"
+          onClick={() => setDrawerOpen(true)}
+          className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full border border-glass text-text-secondary transition-colors hover:bg-white/[0.06] hover:text-text-primary"
           aria-label="菜单"
         >
-          <Menu size={20} />
+          {user && user.picture ? (
+            <img src={user.picture} alt="" className="h-full w-full object-cover" />
+          ) : (
+            <Menu size={20} />
+          )}
         </button>
 
         {/* 标题（可编辑） */}
@@ -280,6 +282,13 @@ export function CodeLab({ onMenu }: { onMenu?: () => void }) {
 
       {/* 运行栏 */}
       <div className="flex items-center gap-3 px-3 py-2.5">
+          <button
+            onClick={() => setInteractiveOpen(true)}
+            disabled={runState === "running"}
+            className="flex h-11 shrink-0 items-center rounded-control border border-glass px-4 text-body font-medium text-text-secondary transition-colors hover:bg-white/[0.06] hover:text-text-primary disabled:opacity-50"
+          >
+            交互
+          </button>
         <button
           onClick={handleRun}
           disabled={runState === "running"}
@@ -309,6 +318,7 @@ export function CodeLab({ onMenu }: { onMenu?: () => void }) {
         <OutputPanel result={result} onClose={() => setResult(null)} />
       )}
 
+        {interactiveOpen && <InteractiveConsole code={code} onClose={() => setInteractiveOpen(false)} />}
       {/* 脚本抽屉 */}
       {drawerOpen && (
         <ScriptDrawer

@@ -1,3 +1,4 @@
+import asyncio
 """代码执行相关路由：自由运行 + 练习判题。"""
 from datetime import date
 from fastapi import APIRouter, Depends, HTTPException
@@ -106,3 +107,61 @@ async def judge_exercise(
         passed=passed,
         expected_output=None if passed else (exercise.expected_output or None),
     )
+
+
+# ============ 交互式运行 WebSocket 端点（C：交互终端）============
+# 路径：/api/run/ws （run.router 已在 main.py include，自动挂载）
+from fastapi import WebSocket, WebSocketDisconnect
+from ..executor import InteractiveSession
+
+
+@router.websocket("/ws")
+async def run_ws(ws: WebSocket):
+    """交互式运行：容器常驻，stdin/stdout 实时双向桥接。"""
+    uid = ws.session.get("user_id") if hasattr(ws, "session") else None
+    if not uid:
+        await ws.close(code=4401)
+        return
+
+    await ws.accept()
+    session = InteractiveSession()
+    pump_task = None
+
+    async def _pump_to_client():
+        try:
+            async for stream, text in session.stream_output():
+                await ws.send_json({"type": "output", "stream": stream, "data": text})
+            code = await session.wait()
+            await ws.send_json({"type": "exit", "code": code})
+        except Exception:
+            pass
+
+    try:
+        while True:
+            msg = await ws.receive_json()
+            mtype = msg.get("type")
+            if mtype == "start":
+                code = msg.get("code", "")
+                if len(code) > 50_000:
+                    await ws.send_json({"type": "error", "data": "代码过长"})
+                    continue
+                if session.proc is not None:
+                    await session.kill()
+                    session = InteractiveSession()
+                await session.start(code)
+                pump_task = asyncio.create_task(_pump_to_client())
+            elif mtype == "stdin":
+                await session.write_stdin(msg.get("data", ""))
+            elif mtype == "eof":
+                await session.close_stdin()
+    except WebSocketDisconnect:
+        pass
+    except Exception as e:
+        try:
+            await ws.send_json({"type": "error", "data": str(e)})
+        except Exception:
+            pass
+    finally:
+        if pump_task and not pump_task.done():
+            pump_task.cancel()
+        await session.kill()

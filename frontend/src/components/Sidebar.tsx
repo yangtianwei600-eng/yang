@@ -26,7 +26,7 @@ function SidebarBody({ active, onSelect, user, streak, onLogout }: SidebarProps)
         <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-control bg-accent/15 text-accent">
           <span className="font-mono text-base font-semibold">Py</span>
         </div>
-        <span className="text-section">学练</span>
+        <span className="text-section">小杨PRO</span>
       </div>
 
       {/* 导航 */}
